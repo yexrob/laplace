@@ -1,0 +1,56 @@
+flowchart TB
+  classDef loop fill:#1d3557,stroke:#0f1c2e,color:#ffffff,stroke-width:2px
+  classDef step fill:#a8dadc,stroke:#457b9d,color:#1d3557,stroke-width:1.5px
+  classDef gate fill:#ffb703,stroke:#c98a00,color:#3d2a00,stroke-width:2px
+  classDef xcut fill:#e9f5db,stroke:#6b8f3f,color:#2d3a1f,stroke-width:1.5px
+  classDef ctr fill:#f1f1f1,stroke:#bdbdbd,color:#555555,stroke-dasharray:3 3
+  classDef cond fill:#ffcdb2,stroke:#c96a2e,color:#5b2a10,stroke-width:1.5px
+
+  START(["用户输入 / 新一轮"]):::loop
+
+  subgraph LOOPBOX["query_loop · 一轮的形状（src/query.rs）"]
+    direction TB
+    A["① 装配工具<br/>tools.rs · 按 depth 与实验开关组装工具池"]:::step
+    B["② 装配系统提示<br/>system.rs · 分段即缓存策略（D10）"]:::step
+    C["③ 发流式请求<br/>api/client · provider-client 契约"]:::step
+    D["④ 收 tool_use 块<br/>不看 stop_reason（不可靠），只看实际出现的块"]:::step
+    G["⑤ gate_tool 逐个过闸"]:::gate
+    E["⑥ executor 执行<br/>并发安全工具并行（≤10）· 非安全串行<br/>永不越过未完成的写操作"]:::step
+    F["⑦ tool_result 回填<br/>5 万字符截断 · 中断时补 is_error 占位"]:::step
+    Q{"仍有 tool_use 且未 end_turn？"}:::cond
+  end
+
+  subgraph GATEBOX["gate_tool（D7：模型只产生意图，副作用归本地）"]
+    direction LR
+    G1["permission<br/>统一权限闸<br/>default / acceptEdits / auto /<br/>bypassPermissions / dontAsk / plan"]:::gate
+    G2["PreToolUse hook<br/>可按事件与 matcher 命中<br/>可改写入参"]:::gate
+    G3["UI 弹窗<br/>经 ui-event 契约"]:::gate
+  end
+
+  subgraph XCUT["横切注入点（每轮循环内的落点）"]
+    direction LR
+    X1["任务提醒<br/>10 轮没碰 Task 且距上次提醒 10 轮"]:::xcut
+    X2["BM25 经验/记忆召回<br/>用户刚说的话触发 · 只注入 active 条目"]:::xcut
+    X3["图片占位符解释<br/>#[image N] 必须说明原因"]:::xcut
+  end
+
+  subgraph COMPRESS["压缩介入（context-management）"]
+    direction TB
+    CM1["TokenGate 请求前按阈值判断<br/>阈值来自当前模型窗口，非常量"]:::xcut
+    CM2["provider 400 溢出补救压缩（D59）"]:::xcut
+    CM3["切分点必须安全跨过 tool_result 边界<br/>否则留下孤儿 tool_result，每次请求都 400"]:::xcut
+    CM4["只追加标记行 · 不重写 canonical history（D74）<br/>连续失败三次熔断 · /compact 可强制"]:::xcut
+  end
+
+  START --> A
+  A --> B --> C --> D --> G
+  G --> G1 --> G2 --> G3
+  G3 --> E --> F --> Q
+  Q -- "是（再来一轮）" --> A
+  Q -- "否" --> ENDX(["end_turn"]):::loop
+
+  D -. "横切注入" .-> XCUT
+  C -. "请求前阈值判断" .-> CM1
+  C -. "400 溢出触发" .-> CM2
+
+  class START,ENDX loop

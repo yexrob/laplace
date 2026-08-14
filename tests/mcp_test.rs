@@ -75,7 +75,7 @@ impl Drop for Server {
 }
 
 #[test]
-fn mcp_lists_16_tools_queries_and_writes() {
+fn mcp_lists_17_tools_queries_and_writes() {
     let src = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/xiyouji");
     let tmp = tempfile::tempdir().unwrap();
     copy_dir(&src, tmp.path());
@@ -90,7 +90,7 @@ fn mcp_lists_16_tools_queries_and_writes() {
 
     let tools = s.request("tools/list", json!({}));
     let list = tools["result"]["tools"].as_array().unwrap();
-    assert_eq!(list.len(), 16, "sixteen tools, SPEC §5");
+    assert_eq!(list.len(), 17, "seventeen tools, SPEC §5");
     assert!(
         list.iter()
             .all(|t| t["description"].as_str().is_some_and(|d| !d.is_empty()))
@@ -125,4 +125,63 @@ fn mcp_lists_16_tools_queries_and_writes() {
     assert!(!err);
     let v: Value = serde_json::from_str(&text).unwrap();
     assert_eq!(v["errors"], 0, "{text}");
+}
+
+#[test]
+fn mcp_scan_mode_serves_every_vault_with_a_selector() {
+    let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures");
+    let mut child = Command::new(env!("CARGO_BIN_EXE_laplace"))
+        .args(["mcp", "--scan", &fixtures.to_string_lossy()])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+    let stdin = child.stdin.take().unwrap();
+    let stdout = BufReader::new(child.stdout.take().unwrap());
+    let mut s = Server {
+        child,
+        stdin,
+        stdout,
+        next_id: 0,
+    };
+
+    s.request(
+        "initialize",
+        json!({ "protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": { "name": "t", "version": "0" } }),
+    );
+
+    // The map of maps: both fixture vaults discovered, both loadable.
+    let (err, text) = s.call_tool("laplace_vaults", json!({}));
+    assert!(!err, "{text}");
+    let v: Value = serde_json::from_str(&text).unwrap();
+    let names: Vec<&str> = v["vaults"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["name"].as_str().unwrap())
+        .collect();
+    assert!(names.contains(&"xiyouji"), "{names:?}");
+    assert!(names.contains(&"bingo"), "{names:?}");
+
+    // Ambiguous call without a selector → helpful refusal listing options.
+    let (err, text) = s.call_tool("laplace_search", json!({ "q": "金箍棒" }));
+    assert!(err, "{text}");
+    assert!(text.contains("xiyouji") && text.contains("bingo"), "{text}");
+
+    // Selected by name → normal answer.
+    let (err, text) = s.call_tool(
+        "laplace_search",
+        json!({ "q": "金箍棒", "vault": "xiyouji" }),
+    );
+    assert!(!err, "{text}");
+    assert!(text.contains("如意金箍棒"), "{text}");
+
+    // Selected by path suffix also works.
+    let (err, text) = s.call_tool(
+        "laplace_architecture",
+        json!({ "vault": "fixtures/bingo/laplace" }),
+    );
+    assert!(!err, "{text}");
+    assert!(text.contains("bingo"), "{text}");
 }

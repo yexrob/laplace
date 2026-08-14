@@ -10,9 +10,95 @@ use anyhow::{Result, anyhow, bail};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::io::{BufRead, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-pub fn serve(vault_dir: PathBuf) -> Result<()> {
+pub enum McpMode {
+    /// One vault, fixed at startup (`--vault` / upward discovery).
+    Single(PathBuf),
+    /// Every vault found under a root (`--scan`); tools select via `vault`.
+    Scan(PathBuf),
+}
+
+struct VaultEntry {
+    name: String,
+    dir: PathBuf,
+    /// Present when schema.yaml exists but the vault cannot load at all.
+    load_error: Option<String>,
+}
+
+/// Find vaults: every directory under `root` containing a schema.yaml
+/// (gitignore-aware walk, hidden dirs skipped).
+fn scan_vaults(root: &Path) -> Vec<VaultEntry> {
+    let mut out = Vec::new();
+    for entry in ignore::WalkBuilder::new(root)
+        .hidden(true)
+        .build()
+        .flatten()
+    {
+        if entry.file_name() == "schema.yaml"
+            && entry.file_type().is_some_and(|t| t.is_file())
+            && let Some(dir) = entry.path().parent()
+        {
+            let (name, load_error) = match vault::load(dir) {
+                Ok(v) => (v.schema.name.clone(), None),
+                Err(e) => (
+                    dir.file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_default(),
+                    Some(format!("{e:#}")),
+                ),
+            };
+            out.push(VaultEntry {
+                name,
+                dir: dir.to_path_buf(),
+                load_error,
+            });
+        }
+    }
+    out.sort_by(|a, b| a.name.cmp(&b.name).then(a.dir.cmp(&b.dir)));
+    out
+}
+
+/// Resolve which vault a call targets. Single mode ignores the `vault` arg;
+/// scan mode needs it whenever more than one loadable vault exists.
+fn resolve_vault_dir(mode: &McpMode, args: &Value) -> Result<PathBuf> {
+    match mode {
+        McpMode::Single(dir) => Ok(dir.clone()),
+        McpMode::Scan(root) => {
+            let entries = scan_vaults(root);
+            let loadable: Vec<&VaultEntry> =
+                entries.iter().filter(|e| e.load_error.is_none()).collect();
+            let wanted = args["vault"].as_str();
+            match (wanted, loadable.as_slice()) {
+                (Some(w), _) => loadable
+                    .iter()
+                    .find(|e| e.name == w || e.dir.ends_with(w))
+                    .map(|e| e.dir.clone())
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "no vault `{w}` — available: {}",
+                            loadable
+                                .iter()
+                                .map(|e| e.name.as_str())
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        )
+                    }),
+                (None, [only]) => Ok(only.dir.clone()),
+                (None, []) => bail!("no loadable vault under {}", root.display()),
+                (None, many) => bail!(
+                    "several vaults here — pass `vault`: {}",
+                    many.iter()
+                        .map(|e| e.name.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+            }
+        }
+    }
+}
+
+pub fn serve(mode: McpMode) -> Result<()> {
     let stdin = std::io::stdin();
     let mut stdout = std::io::stdout().lock();
     for line in stdin.lock().lines() {
@@ -47,7 +133,7 @@ pub fn serve(vault_dir: PathBuf) -> Result<()> {
             "tools/call" => {
                 let name = msg["params"]["name"].as_str().unwrap_or("");
                 let args = msg["params"]["arguments"].clone();
-                match call(&vault_dir, name, args) {
+                match call(&mode, name, args) {
                     Ok(v) => json!({
                         "content": [{ "type": "text", "text": serde_json::to_string_pretty(&v)? }],
                         "isError": false,
@@ -77,8 +163,42 @@ fn respond(out: &mut impl Write, v: Value) -> Result<()> {
     Ok(())
 }
 
-fn call(vault_dir: &std::path::Path, name: &str, args: Value) -> Result<Value> {
-    let v = vault::load(vault_dir)?;
+fn call(mode: &McpMode, name: &str, args: Value) -> Result<Value> {
+    if name == "laplace_vaults" {
+        let root = match mode {
+            McpMode::Single(dir) => dir.clone(),
+            McpMode::Scan(root) => root.clone(),
+        };
+        let entries = match mode {
+            McpMode::Single(dir) => vec![VaultEntry {
+                name: vault::load(dir).map(|v| v.schema.name).unwrap_or_default(),
+                dir: dir.clone(),
+                load_error: None,
+            }],
+            McpMode::Scan(root) => scan_vaults(root),
+        };
+        return Ok(json!({
+            "root": root,
+            "vaults": entries.iter().map(|e| {
+                match &e.load_error {
+                    Some(err) => json!({ "name": e.name, "path": e.dir, "loadable": false, "error": err }),
+                    None => match vault::load(&e.dir) {
+                        Ok(v) => {
+                            let r = validate::run(&v);
+                            json!({
+                                "name": e.name, "path": e.dir, "loadable": true,
+                                "entities": v.entities.len(),
+                                "errors": r.errors(), "warnings": r.warnings(),
+                            })
+                        }
+                        Err(err) => json!({ "name": e.name, "path": e.dir, "loadable": false, "error": format!("{err:#}") }),
+                    },
+                }
+            }).collect::<Vec<_>>(),
+        }));
+    }
+    let vault_dir = resolve_vault_dir(mode, &args)?;
+    let v = vault::load(&vault_dir)?;
     let s = |k: &str| -> Result<String> {
         args[k]
             .as_str()
@@ -307,5 +427,8 @@ fn tool_defs() -> Vec<Value> {
                 "path": sp("(kinds|relations).<name>.<field> (set op)"), "value": sp("new value (set op)"),
                 "old": sp("old name (rename ops)"), "new": sp("new name (rename ops)")
             }), &["op"]) }),
+        json!({ "name": "laplace_vaults",
+            "description": "List the vaults this server can see (name, path, entity count, validity) — the map of maps.",
+            "inputSchema": { "type": "object", "properties": {}, "required": [] } }),
     ]
 }

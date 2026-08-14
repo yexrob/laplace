@@ -1,0 +1,85 @@
+flowchart TB
+  classDef sub fill:#1d3557,stroke:#0f1c2e,color:#ffffff,stroke-width:2px
+  classDef mod fill:#a8dadc,stroke:#457b9d,color:#1d3557,stroke-width:1.5px
+  classDef ctr fill:#e9f5db,stroke:#6b8f3f,color:#2d3a1f,stroke-width:1.5px
+  classDef inv fill:#ffcdb2,stroke:#c96a2e,color:#5b2a10,stroke-width:1.5px
+  classDef note fill:#f1f1f1,stroke:#bdbdbd,color:#555555,stroke-dasharray:3 3
+
+  subgraph DRV["依赖 agent-core 的子系统"]
+    HOSTS["hosts<br/>四种驱动方式"]
+    MA["multi-agent<br/>多 agent 体系"]
+    EXP["experience-library<br/>跨 session 经验库"]
+  end
+
+  subgraph COREBOX["agent-core · 回合循环"]
+    direction TB
+    subgraph INNER["内部模块"]
+      direction TB
+      QRY["query<br/>query_loop · 循环本体与横切注入"]
+      PERM["permission<br/>统一权限闸"]
+      HOOKS["hooks<br/>shell hook 执行侧"]
+      WATCH["watch<br/>可观察对象通知"]
+      QRY -->|depends-on| PERM
+      QRY -->|depends-on| HOOKS
+      QRY -->|depends-on| WATCH
+    end
+    CFILES["源文件：query.rs · query_session.rs（Session/Runtime 热改）· query_turn.rs（流内重试）· tools.rs（按 depth 组装工具池）"]
+  end
+
+  subgraph CON["契约"]
+    direction TB
+    TTOOL["tool-trait<br/>模型能力唯一入口"]
+    PCLI["provider-client<br/>provider 中立协议"]
+    HJSON["hooks-json<br/>shell hook JSON 契约"]
+    UIEV["ui-event<br/>与前端渲染无关契约"]
+  end
+
+  subgraph DEPS["agent-core 依赖的子系统"]
+    direction TB
+    PL["provider-layer<br/>多 provider 协议抽象"]
+    TL["tool-layer<br/>工具实现与装配"]
+    CM["context-management<br/>系统提示 / 记忆 / 压缩"]
+  end
+
+  subgraph INV["不变量 binds"]
+    NU["no-unwrap<br/>禁 unwrap / expect / unsafe"]
+    TRP["tool-result-pairing<br/>tool_use 恰配 tool_result"]
+  end
+
+  %% 驱动方
+  HOSTS -->|depends-on| QRY
+  MA -->|depends-on| QRY
+  EXP -->|depends-on| QRY
+  QRY -->|depends-on| EXP
+
+  %% agent-core 对外契约
+  QRY -->|consumes| TTOOL
+  QRY -->|consumes| PCLI
+  QRY -->|consumes| HJSON
+  WATCH -->|consumes| UIEV
+
+  %% 契约与定义方
+  PL -->|defines| PCLI
+  TL -->|defines| TTOOL
+  HOOKS -->|defines| HJSON
+  QRY -->|defines| UIEV
+
+  %% 底层依赖
+  QRY -->|depends-on| PL
+  QRY -->|depends-on| TL
+  QRY -->|depends-on| CM
+  TL -->|depends-on| WATCH
+
+  %% gates 治理
+  HOOKS -->|gates| TL
+  PERM -->|gates| TL
+
+  %% 不变量
+  NU -->|binds| QRY
+  TRP -->|binds| QRY
+
+  class HOSTS,MA,EXP,PL,TL,CM sub
+  class QRY,PERM,HOOKS,WATCH mod
+  class TTOOL,PCLI,HJSON,UIEV ctr
+  class NU,TRP inv
+  class CFILES note

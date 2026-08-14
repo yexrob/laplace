@@ -63,7 +63,7 @@ Three perception paths, one background channel, one accepted limitation:
 
 | Interface | Form | Notes |
 |---|---|---|
-| `laplace init` | CLI | scaffold `laplace.yaml` + schema preamble interactively or from a template |
+| `laplace init` | CLI | scaffold `laplace/schema.yaml` with a commented constitution template |
 | `laplace validate` | CLI | schema + ref integrity; CI-friendly exit codes |
 | `laplace add/update/link/unlink/remove/rename` | CLI + MCP | the write operations: transactional, validate-before-write, atomic; `rename` rewrites all inbound refs (SPEC §2) |
 | `laplace schema <op>` | CLI + MCP | constitutional operations — add-kind/add-relation/set/rename-kind/rename-relation; renames rewrite every usage vault-wide atomically (SPEC §2) |
@@ -72,7 +72,7 @@ Three perception paths, one background channel, one accepted limitation:
 | `laplace export` | CLI | full graph JSON to stdout — the jq/pipeline escape hatch |
 | `laplace summary` | CLI | entity index + relation digest + recent changes, **token-capped** (tiered truncation: counts → kind index → per-entity lines); designed to be injected into an agent's system context by the harness (Claude Code: CLAUDE.md snippet or SessionStart hook) |
 | `laplace serve` | CLI | read-only HTML view (tiny_http, GET-only) |
-| `laplace mcp` | MCP server (stdio) | 16 tools: 7 queries + validate + drift + 6 write operations + schema ops; no raw-file writes — semantic operations only |
+| `laplace mcp [--scan DIR]` | MCP server (stdio) | 17 tools: 7 queries + validate + drift + 6 write ops + schema ops + vaults; --scan serves every vault under DIR with a per-call `vault` selector |
 | skill | `skill/entity-map/` | the maintenance discipline as an installable agent skill: when to generate/refresh, "update the truth whenever a change touches entities", "the summary is not enough — query, don't guess" |
 
 ## HTML view

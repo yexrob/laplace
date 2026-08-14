@@ -119,8 +119,13 @@ enum Cmd {
     },
     /// Full graph JSON to stdout — the jq/pipeline escape hatch.
     Export,
-    /// MCP server on stdio (16 tools).
-    Mcp,
+    /// MCP server on stdio (17 tools).
+    Mcp {
+        /// Scan DIR (default ".") for every vault instead of serving one;
+        /// tools then take a `vault` selector, `laplace_vaults` lists them.
+        #[arg(long, num_args = 0..=1, default_missing_value = ".")]
+        scan: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -218,11 +223,15 @@ fn run(cli: Cli) -> Result<ExitCode> {
     if let Cmd::Init { name } = &cli.cmd {
         return init(&cwd, name.as_deref());
     }
-    let dir = vault::discover(&cwd, cli.vault.as_deref())?;
-    if matches!(cli.cmd, Cmd::Mcp) {
-        mcp::serve(dir)?;
+    if let Cmd::Mcp { scan } = &cli.cmd {
+        let mode = match scan {
+            Some(root) => mcp::McpMode::Scan(root.clone()),
+            None => mcp::McpMode::Single(vault::discover(&cwd, cli.vault.as_deref())?),
+        };
+        mcp::serve(mode)?;
         return Ok(ExitCode::SUCCESS);
     }
+    let dir = vault::discover(&cwd, cli.vault.as_deref())?;
     let vault = vault::load(&dir)?;
 
     // The write operations and drift/export.

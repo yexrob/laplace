@@ -1,1 +1,4 @@
 /target
+
+# bingo harness project-local config (machine-specific test setup)
+/.bingo/
