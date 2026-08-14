@@ -129,7 +129,11 @@ The agent's creation path. Six operations, identical semantics over CLI and MCP;
 | `remove` | delete an entity | **refuses if inbound refs exist**, listing them (unlink first) — danglings are impossible by construction |
 | `rename` | rename/move an entity (name and/or namespace), atomically rewriting **all inbound refs** across the vault | target path free; reports the count of prose *mentions* of the old name in bodies (bodies are never rewritten — prose is human domain; the agent reviews those by hand) |
 
-Input forms: CLI flags for the simple cases, `--json` on stdin for full payloads; MCP tools take structured params. Multi-file transactions (`rename`) write all temp files first, then rename all; git is the rollback of last resort.
+**Schema operations** — constitutional changes are vault-wide transactions and get the same mediation: `laplace schema add-kind|add-relation|set|rename-kind|rename-relation`. `add-relation` enforces the reading-direction description at creation time; `set` re-checks propagation/symmetric legality; the renames atomically rewrite every usage across entity frontmatters (`rename-kind` also moves the kind directory). Direct schema edits remain legal; `validate` reconciles.
+
+Input forms: CLI flags for the simple cases, `--json` on stdin for full payloads; MCP tools take structured params (the schema family is one MCP tool, `laplace_schema`, with an `op` discriminator). Multi-file transactions (renames) write all temp files first, then rename all; git is the rollback of last resort.
+
+**Addressability**: refs are paths (`character:孙悟空` ⇔ `laplace/character/孙悟空.md` — locating an entity is a pure function, never a search); `get` returns the entity's vault path; the constitution stays small by vocabulary budget, so YAML key paths (`relations.师从.propagation`) address it; diagnostics carry `file:line`.
 
 What this buys: the model does judgment (what to name, what to connect, why), the machine does syntax (envelope shape is impossible to get wrong — the tool serializes), and ref errors are caught synchronously at write time instead of by a later lint.
 
@@ -141,10 +145,10 @@ What this buys: the model does judgment (what to name, what to connect, why), th
 2. **Declaration**: entity's kind directory ∈ `schema.kinds`; every relation type ∈ `schema.relations`; propagation values legal; relation declarations carry descriptions.
 3. **Reference**: every target resolves; danglings get did-you-mean (same name under another kind/namespace, or edit distance ≤ 2).
 
-Errors are file-addressed: `{severity, code, file, path?, message, suggestion?}` — e.g.
+Errors are file-and-line-addressed: `{severity, code, file, line?, path?, message, suggestion?}` — e.g.
 
 ```
-laplace/character/沈雨.md: relations.宿敌 → character:沈玉
+laplace/character/沈雨.md:6: relations.宿敌 → character:沈玉
   dangling-ref: no such entity. Did you mean character:沈雨?
 ```
 
@@ -163,14 +167,14 @@ Seven tools; one semantics shared by CLI (`laplace query <tool>`, human text def
 | tool | signature | returns |
 |---|---|---|
 | `search` | `q, kind?, tag?, limit=20` | ranked refs; score = max of name-exact 100, name-prefix 80, name-substring 60, title-substring 50, tag-exact 40, body-substring 20; Unicode-casefolded; ties by kind then ref |
-| `get` | `ref` | frontmatter + full body + computed edges both directions with attrs |
+| `get` | `ref` | frontmatter + full body + computed edges both directions with attrs + the entity's vault path |
 | `neighbors` | `ref, depth=1 (max 2), kinds?, relations?` | induced subgraph around ref — the serve view's data source |
 | `trace` | `from, to, limit=5, max_len=6` | shortest simple paths, undirected view, hops annotated `(type, direction)` — "how are these two connected?" |
 | `impact` | `ref, depth=10, via?` | BFS closure over the propagation digraph: `{ref, distance, path}` with one shortest witness path each, distance-sorted — "what does changing this touch?" Output is a **candidate set, not an oracle**: sound w.r.t. the declared map, complete never; distance is the confidence gradient |
 | `architecture` | — | kind-level condensation: `{kind, count}` nodes, `{from_kind, type, to_kind, count}` edges — the whole-map overview that is safe to render, and the usage precedent for vocabulary choices |
 | `schema` | — | the constitution: charter, kinds, relation types with descriptions and propagation — the agent's first stop before writing |
 
-MCP tool descriptions are contract: each carries a one-line when-to-use (e.g. `laplace_search`: "resolve names to refs — search before adding or guessing"). MCP exposes the seven queries, `laplace_validate`, `laplace_drift`, and the six write operations (§2) — fifteen tools. There is no raw-file write tool; writes are semantic operations only.
+MCP tool descriptions are contract: each carries a one-line when-to-use (e.g. `laplace_search`: "resolve names to refs — search before adding or guessing"). MCP exposes the seven queries, `laplace_validate`, `laplace_drift`, the six write operations, and `laplace_schema` (§2) — sixteen tools. There is no raw-file write tool; writes are semantic operations only.
 
 ## 6. Drift (cross-session calibration as a tool)
 
@@ -212,13 +216,14 @@ If your work touches an entity (add/rename/remove/re-relate), update the map in 
 ```
 laplace init                         scaffold laplace/schema.yaml (+ example entity) — only if absent
 laplace add|update|link|unlink|remove|rename   write operations (§2)
+laplace schema <op>                  constitutional operations: add-kind/add-relation/set/rename-kind/rename-relation (§2)
 laplace validate [--json]
 laplace query <tool> …               §5
 laplace drift [--since REV]          §6
 laplace summary [--budget N]
 laplace export                       full graph JSON to stdout (same payload as /api/graph)
 laplace serve [--port 6174]          read-only HTML view: list/search/filter, detail, 1–2 hop Mermaid neighborhood, copy-ref
-laplace mcp                          MCP server on stdio (15 tools)
+laplace mcp                          MCP server on stdio (16 tools)
 ```
 
 Global: `--vault DIR`. Deliberate non-tools: no `fmt` (nothing to format — writes are already canonical, bodies are prose), no `watch` (lazy rebuild), no `stats` (`architecture` is it), no raw-file write (semantic operations only).

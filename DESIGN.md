@@ -66,12 +66,13 @@ Three perception paths, one background channel, one accepted limitation:
 | `laplace init` | CLI | scaffold `laplace.yaml` + schema preamble interactively or from a template |
 | `laplace validate` | CLI | schema + ref integrity; CI-friendly exit codes |
 | `laplace add/update/link/unlink/remove/rename` | CLI + MCP | the write operations: transactional, validate-before-write, atomic; `rename` rewrites all inbound refs (SPEC §2) |
+| `laplace schema <op>` | CLI + MCP | constitutional operations — add-kind/add-relation/set/rename-kind/rename-relation; renames rewrite every usage vault-wide atomically (SPEC §2) |
 | `laplace query <tool>` | CLI | `search`, `get`, `neighbors`, `trace`, `impact`, `architecture`, `schema`; JSON or text output (SPEC §5) |
 | `laplace drift` | CLI | session-start freshness audit: stale entities (via `spec.source` anchors) + uncovered changed paths + unanchored ratio (SPEC §5) |
 | `laplace export` | CLI | full graph JSON to stdout — the jq/pipeline escape hatch |
 | `laplace summary` | CLI | entity index + relation digest + recent changes, **token-capped** (tiered truncation: counts → kind index → per-entity lines); designed to be injected into an agent's system context by the harness (Claude Code: CLAUDE.md snippet or SessionStart hook) |
 | `laplace serve` | CLI | read-only HTML view (tiny_http, GET-only) |
-| `laplace mcp` | MCP server (stdio) | 15 tools: 7 queries + validate + drift + 6 write operations; no raw-file writes — semantic operations only |
+| `laplace mcp` | MCP server (stdio) | 16 tools: 7 queries + validate + drift + 6 write operations + schema ops; no raw-file writes — semantic operations only |
 | skill | `skill/entity-map/` | the maintenance discipline as an installable agent skill: when to generate/refresh, "update the truth whenever a change touches entities", "the summary is not enough — query, don't guess" |
 
 ## HTML view
@@ -104,7 +105,7 @@ Three perception paths, one background channel, one accepted limitation:
 ## Milestones
 
 - **M1 — core**: vault model (path-is-identity, frontmatter), schema constitution + validation, in-memory graph engine, `laplace validate` + `laplace query` (7 tools, CLI); two fixture vaults hand-authored in different domains — bingo (codebase) and 西游记·前七回 (narrative, Unicode-native refs)
-- **M2 — operations & channels**: the six write operations (CLI + MCP), `laplace mcp` (15 tools), `laplace drift`, `laplace export`; fixture edits exercised through the ops path
+- **M2 — operations & channels**: the write and schema operations (CLI + MCP), `laplace mcp` (16 tools), `laplace drift`, `laplace export`; fixture edits exercised through the ops path
 - **M3 — inject**: `laplace summary` with token cap + the `entity-map` skill (drift-aware session-start discipline); end-to-end: agent maintains the map on a fixture, summary + on-demand query replaces full-YAML reading
 - **M4 — view**: `laplace serve`; browse/search/filter/multi-select/copy-ref on both fixtures
 - **M5 — skeleton** (phase 2): tree-sitter symbol extraction for parseable projects — the objective drift evidence beyond file-level anchors
