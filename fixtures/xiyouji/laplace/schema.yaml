@@ -1,0 +1,58 @@
+apiVersion: laplace/v1
+name: xiyouji
+title: 西游记·大闹天宫（前七回）
+charter:
+  - 改写或删除一个角色，哪些回目、事件和法宝要跟着重看？
+  - 一件法宝的来历或归属变了，波及哪些持有者、事件与回目？
+  - 改动一个事件的经过，哪些人物、地点和后续事件会失去依据？
+ignore:
+  - "notes/**"
+  - "laplace/**"
+kinds:
+  character:
+    description: 人物。描述应涵盖出身来历、本事与所持法宝、在这七回里的动机与立场，以及与谁结怨结缘。神仙妖魔一视同仁，不按阵营分 kind。
+  artifact:
+    description: 法宝、兵器与文书。描述应涵盖来历、能力与限制、经手过谁、在哪一回易主或失效。凡是会被人“持有”或被事件“涉及”的死物都在此。
+  location:
+    description: 地点与地界。描述应涵盖方位归属、谁在此当家、这里发生过哪几件要紧事。只收在这七回里被真正用到的地界，路过一句的不收。
+  event:
+    description: 情节事件。描述应涵盖起因、经过、结果，以及它给后文留下的伏笔或亏欠。一个事件对应原著里一段可指认的情节，不是抽象主题；能用“承接”串起来的才立。
+  chapter:
+    description: 回目。title 用全回目名，正文是梗概，source 锚到 chapters/chNN.md。只作锚点与容器，自己不指向别的实体——回目是被指的一端。
+relations:
+  师从:
+    description: A 师从 B —— A 是徒弟，B 是师父。改写师父的道法或身份，徒弟的一身本事就没了来路，必须重看。
+    propagation: to-source
+    from: [character]
+    to: [character]
+  持有:
+    description: A 持有 B —— A 是持有者，B 是器物。器物的设定变了，持有者的战力与行事必须重看；换个人拿着，器物本身的来历重量却不变。
+    propagation: to-source
+    from: [character]
+    to: [artifact]
+  隶属:
+    description: A 隶属 B —— A 是属官、部众或住民，B 是他所属的地界或衙门。地界的规矩与归属变了，底下所有人都要重看。
+    propagation: to-source
+    from: [character]
+    to: [location]
+  结义:
+    description: A 与 B 结义 —— 互为结拜兄弟，无主从之分，对称。盟约是双向的：一方被改写，另一方的立场同样站不住。
+    symmetric: true
+    propagation: both
+    from: [character]
+    to: [character]
+  涉及:
+    description: A 涉及 B —— A 是事件，B 是被卷进这件事的人物、器物或发生的地点。两头互为依据：人物或地点改了事件写不下去，事件改了他们的履历也就作废。
+    propagation: both
+    from: [event]
+    to: [character, artifact, location]
+  承接:
+    description: A 承接 B —— A 是后续事件，B 是它的前因。前因改了，后续无所依凭；后续改了，前因照旧成立。
+    propagation: to-source
+    from: [event]
+    to: [event]
+  出现于:
+    description: A 出现于 B —— A 是人物、器物、地点或事件，B 是回目。A 改了，这些回目的正文都得重写；回目本身只是容器，改它不反过来定义 A。
+    propagation: to-target
+    from: [character, artifact, location, event]
+    to: [chapter]
