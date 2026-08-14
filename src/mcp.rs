@@ -362,7 +362,16 @@ fn call(mode: &McpMode, name: &str, args: Value) -> Result<Value> {
 fn _rel_shape_doc(_: BTreeMap<String, Vec<RelEntry>>) {}
 
 fn tool_defs() -> Vec<Value> {
-    let obj = |props: Value, required: &[&str]| json!({ "type": "object", "properties": props, "required": required });
+    let obj = |props: Value, required: &[&str]| {
+        // Every tool addresses a vault; the selector matters once --scan
+        // serves several. Injected here so no def can forget it.
+        let mut props = props;
+        props["vault"] = json!({
+            "type": "string",
+            "description": "which vault to address (schema name like `xiyouji`, or a path suffix) — required only when several vaults are loaded; laplace_vaults lists them"
+        });
+        json!({ "type": "object", "properties": props, "required": required })
+    };
     let sp = |desc: &str| json!({ "type": "string", "description": desc });
     vec![
         json!({ "name": "laplace_search",

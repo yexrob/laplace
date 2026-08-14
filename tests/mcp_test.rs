@@ -95,6 +95,18 @@ fn mcp_lists_17_tools_queries_and_writes() {
         list.iter()
             .all(|t| t["description"].as_str().is_some_and(|d| !d.is_empty()))
     );
+    // Every tool except laplace_vaults must expose the vault selector —
+    // this regressed once when a formatter-shifted patch silently no-opped.
+    let missing: Vec<&str> = list
+        .iter()
+        .filter(|t| t["name"] != "laplace_vaults")
+        .filter(|t| t["inputSchema"]["properties"]["vault"].is_null())
+        .map(|t| t["name"].as_str().unwrap())
+        .collect();
+    assert!(
+        missing.is_empty(),
+        "tools without vault selector: {missing:?}"
+    );
 
     // Query.
     let (err, text) = s.call_tool("laplace_search", json!({ "q": "金箍棒" }));
