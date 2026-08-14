@@ -78,7 +78,18 @@
   .sect-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px;
                padding-bottom: 5px; border-bottom: 1px solid var(--hair); }
 
-  .figure { border: 1px solid var(--hair); padding: 10px; }
+  .figure { border: 1px solid var(--hair); padding: 10px; overflow-x: auto; }
+  table.matrix { border-collapse: collapse; width: 100%; }
+  .matrix th, .matrix td { border: 1px solid var(--hair); padding: 8px 12px; vertical-align: top; }
+  .matrix th { font-family: var(--sans); font-size: 12px; font-weight: 500; text-align: left; }
+  .matrix th button { display: inline-flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 13px; }
+  .matrix th button:hover { color: var(--accent); }
+  .matrix th .count { color: var(--ink-2); font-size: 12px; }
+  .matrix td { font-family: var(--mono); font-size: 12.5px; line-height: 1.8; }
+  .matrix td.diag { background: var(--hair-soft); }
+  .matrix td.empty { color: var(--hair); text-align: center; }
+  .matrix td .n { color: var(--ink-2); }
+  .matrix .corner { color: var(--ink-2); font-family: var(--mono); font-size: 11px; }
   .figcap {
     margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--hair-soft);
     font-family: var(--mono); font-size: 11px; color: var(--ink-2);
@@ -87,10 +98,6 @@
   /* ── L0 ──────────────────────────────────────────────────── */
   .charter { max-width: 72ch; }
   .charter li { margin: 4px 0 4px 1.2em; }
-  .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; }
-  .legend button { display: inline-flex; align-items: center; gap: 7px;
-                   font-family: var(--mono); font-size: 12.5px; padding: 3px 2px; }
-  .legend button:hover { color: var(--accent); }
   .swatch { width: 10px; height: 10px; border: 1px solid var(--ink-2); display: inline-block; }
   .smallprint { font-size: 13px; color: var(--ink-2); max-width: 72ch; }
   .smallprint li { margin-left: 1.2em; }
@@ -248,12 +255,6 @@ function renderOverview() {
   const charter = s.charter.length
     ? `<section class="charter"><div class="sect-head"><span class="lbl">Charter — why this map exists</span></div>
        <ul>${s.charter.map(c => `<li>${esc(c)}</li>`).join("")}</ul></section>` : "";
-  const counts = {};
-  for (const n of D.nodes) counts[n.kind] = (counts[n.kind] || 0) + 1;
-  const legend = s.kinds.map(k =>
-    `<button onclick="location.hash='#/k/${encodeURIComponent(k.kind)}'">
-       <span class="swatch" style="background:${kindTint[k.kind]}"></span>${esc(k.kind)} · ${counts[k.kind] || 0}
-     </button>`).join("");
   const extras = [];
   if (s.exclusions.length)
     extras.push(`<div class="sect-head"><span class="lbl">Exclusions — deliberately not mapped</span></div>
@@ -261,80 +262,46 @@ function renderOverview() {
   $("main").innerHTML = `
     ${charter}
     <section>
-      <div class="sect-head"><span class="lbl">Fig. 1 — Architecture (kind-level condensation)</span></div>
-      <div class="figure">${condensationSVG()}<div class="legend">${legend}</div>
-        <div class="figcap">${s.kinds.length} kinds · ${D.counts.edges} relations aggregated by type — click a kind to open its register</div>
+      <div class="sect-head"><span class="lbl">Fig. 1 — Architecture matrix (row → column)</span></div>
+      <div class="figure">${matrixHTML()}
+        <div class="figcap">each cell: relations from the row kind to the column kind, with edge counts · headers carry entity counts · click a kind to open its register</div>
       </div>
     </section>
     ${extras.length ? `<section class="smallprint">${extras.join("")}</section>` : ""}`;
 }
 
-/* Circular deterministic layout: kinds on a ring, aggregated edges as arcs. */
-function condensationSVG() {
+/* Architecture matrix: kinds × kinds, cells list relation types with counts.
+   Zero label collisions at any density — the honest plate for dense maps. */
+function matrixHTML() {
   const kinds = D.schema.kinds.map(k => k.kind);
   const counts = {};
   for (const n of D.nodes) counts[n.kind] = (counts[n.kind] || 0) + 1;
-  const agg = {}; // "a|b" -> [{rel, n, from, to}]
+  const cell = {}; // "a|b" -> [{rel, n}]
   for (const e of D.edges) {
-    const a = byRef[e.from].kind, b = byRef[e.to].kind;
-    const key = a + "|" + e.rel + "|" + b;
-    agg[key] = agg[key] || { from: a, to: b, rel: e.rel, n: 0 };
-    agg[key].n++;
+    const a = byRef[e.from].kind, b = byRef[e.to].kind, key = a + "|" + b;
+    const list = (cell[key] = cell[key] || {});
+    list[e.rel] = (list[e.rel] || 0) + 1;
   }
-  const W = 860, H = 430, cx = W / 2, cy = H / 2, R = Math.min(W, H) / 2 - 74;
-  const pos = {};
-  kinds.forEach((k, i) => {
-    const a = -Math.PI / 2 + (2 * Math.PI * i) / kinds.length;
-    pos[k] = { x: cx + R * Math.cos(a), y: cy + R * Math.sin(a) };
-  });
-  const rOf = (k) => 12 + Math.sqrt(counts[k] || 1) * 3.4;
-  let defs = `<defs><marker id="arr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
-    <path d="M0,0 L8,4 L0,8 z" fill="#6A6F76"/></marker></defs>`;
-  let edges = "", labels = "";
-  const groups = Object.values(agg);
-  const pairIdx = {};
-  for (const g of groups) {
-    const p1 = pos[g.from], p2 = pos[g.to];
-    if (!p1 || !p2) continue;
-    if (g.from === g.to) { // self-loop: arc above, label pushed away from the ring's center
-      const r = rOf(g.from);
-      const x = p1.x, y = p1.y - r;
-      const outward = p1.x >= cx;
-      edges += `<path class="edge" marker-end="url(#arr)" d="M ${x - 6} ${y} C ${x - 30} ${y - 40}, ${x + 30} ${y - 40}, ${x + 6} ${y}"/>`;
-      labels += `<text class="edgelbl" x="${x + (outward ? 34 : -34)}" y="${y - 34}"
-                   text-anchor="${outward ? "start" : "end"}">${esc(g.rel)} ×${g.n}</text>`;
-      continue;
+  const head = (k) =>
+    `<button onclick="location.hash='#/k/${encodeURIComponent(k)}'">
+       <span class="swatch" style="background:${kindTint[k]}"></span>${esc(k)}
+       <span class="count">· ${counts[k] || 0}</span></button>`;
+  let html = `<table class="matrix"><thead><tr><th class="corner">from ↓ · to →</th>`;
+  for (const k of kinds) html += `<th>${head(k)}</th>`;
+  html += `</tr></thead><tbody>`;
+  for (const a of kinds) {
+    html += `<tr><th>${head(a)}</th>`;
+    for (const b of kinds) {
+      const list = cell[a + "|" + b];
+      const cls = a === b ? "diag" : "";
+      if (!list) { html += `<td class="${cls} empty">·</td>`; continue; }
+      const lines = Object.entries(list).sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0], "zh"))
+        .map(([rel, n]) => `${esc(rel)} <span class="n">×${n}</span>`).join("<br>");
+      html += `<td class="${cls}">${lines}</td>`;
     }
-    const pk = [g.from, g.to].sort().join("|");
-    const idx = (pairIdx[pk] = (pairIdx[pk] || 0) + 1) - 1;
-    const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
-    const dx = p2.x - p1.x, dy = p2.y - p1.y, len = Math.hypot(dx, dy) || 1;
-    // Parallel edges fan out on alternating sides, wide enough to keep labels apart.
-    const off = (idx % 2 === 0 ? 1 : -1) * (24 + 30 * Math.floor(idx / 2));
-    const nx = -dy / len, ny = dx / len;
-    const qx = mx + nx * off, qy = my + ny * off;
-    // trim endpoints to node radius
-    const r1 = rOf(g.from), r2 = rOf(g.to);
-    const t1 = r1 / len, t2 = 1 - (r2 + 4) / len;
-    const sx = p1.x + dx * t1, sy = p1.y + dy * t1;
-    const ex = p1.x + dx * t2, ey = p1.y + dy * t2;
-    edges += `<path class="edge" marker-end="url(#arr)" d="M ${sx} ${sy} Q ${qx} ${qy} ${ex} ${ey}"/>`;
-    // Label sits at t=0.28 along the curve — near the source, off the crowded center.
-    const lt = 0.40, omt = 1 - lt;
-    const lx = omt * omt * sx + 2 * omt * lt * qx + lt * lt * ex;
-    const ly = omt * omt * sy + 2 * omt * lt * qy + lt * lt * ey;
-    labels += `<text class="edgelbl" x="${lx}" y="${ly - 3}" text-anchor="middle">${esc(g.rel)} ×${g.n}</text>`;
+    html += `</tr>`;
   }
-  let nodes = "";
-  for (const k of kinds) {
-    const p = pos[k], r = rOf(k);
-    nodes += `<g class="node" onclick="location.hash='#/k/${encodeURIComponent(k)}'">
-      <circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${kindTint[k]}22" stroke="${kindTint[k]}" stroke-width="1.2"/>
-      <text x="${p.x}" y="${p.y + r + 15}" text-anchor="middle" font-size="12">${esc(k)}</text>
-      <text x="${p.x}" y="${p.y + 4}" text-anchor="middle" font-size="11" fill="#6A6F76">${counts[k] || 0}</text>
-    </g>`;
-  }
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="architecture">${defs}${edges}${labels}${nodes}</svg>`;
+  return html + `</tbody></table>`;
 }
 
 /* ── L1: the kind register ──────────────────────────────────── */
@@ -440,7 +407,7 @@ function axialSVG(center) {
   if (!left.length && !right.length)
     return `<p class="dim" style="padding:6px">isolated entry — no relations either way</p>`;
 
-  const ROW = 30, HEAD = 22, PAD = 10, BW = 172, BH = 24, GAP = 96, OUTER = 128;
+  const ROW = 34, HEAD = 24, PAD = 12, BW = 188, BH = 28, GAP = 104, OUTER = 140;
   const sideH = (gs) => gs.reduce((h, g) => h + HEAD + g.refs.length * ROW + PAD, 0);
   const H = Math.max(sideH(left), sideH(right), 90) + 16;
   const W = BW * 3 + GAP * 2 + 8;
@@ -455,7 +422,7 @@ function axialSVG(center) {
     let y = 8, out = "";
     for (const g of groups) {
       const head = isLeft ? `${g.rel} ×${g.refs.length} →` : `→ ${g.rel} ×${g.refs.length}`;
-      out += `<text x="${isLeft ? x + BW : x}" y="${y + 12}" font-size="10.5" fill="#6A6F76"
+      out += `<text x="${isLeft ? x + BW : x}" y="${y + 12}" font-size="11.5" fill="#6A6F76"
                 text-anchor="${isLeft ? "end" : "start"}" letter-spacing="1">${esc(head)}</text>`;
       y += HEAD;
       for (const ref of g.refs) {
@@ -468,7 +435,7 @@ function axialSVG(center) {
           <title>${esc(ref)}</title>
           <rect x="${x}" y="${y}" width="${BW}" height="${BH}" fill="${tint}14" stroke="var(--hair)"/>
           <rect x="${x}" y="${y}" width="3" height="${BH}" fill="${tint}"/>
-          <text x="${x + 10}" y="${y + BH / 2 + 4}" font-size="12">${esc(disp)}</text></g>`;
+          <text x="${x + 10}" y="${y + BH / 2 + 4.5}" font-size="13">${esc(disp)}</text></g>`;
         if (depth === 2) {
           const nbrs = [...outEdges[ref], ...inEdges[ref]]
             .map(e2 => (e2.from === ref ? e2.to : e2.from))
@@ -492,7 +459,7 @@ function axialSVG(center) {
   };
   s += drawSide(left, cxL, true) + drawSide(right, cxR, false);
   s += `<rect x="${cxC}" y="${cyC - BH / 2 - 2}" width="${BW}" height="${BH + 4}" fill="none" stroke="var(--ink)" stroke-width="1.2"/>
-        <text x="${cxC + 10}" y="${cyC + 4}" font-size="12.5" font-weight="600">${esc((center.title || center.name).slice(0, 12))}</text>`;
+        <text x="${cxC + 10}" y="${cyC + 4.5}" font-size="13.5" font-weight="600">${esc((center.title || center.name).slice(0, 12))}</text>`;
   const ox = depth === 2 ? OUTER : 0;
   return `<svg viewBox="${-ox} 0 ${W + ox * 2} ${H}" width="100%" role="img" aria-label="neighborhood">${s}</svg>`;
 }

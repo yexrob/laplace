@@ -273,7 +273,7 @@ Global: `--vault DIR`. Deliberate non-tools: no `fmt` (nothing to format — wri
 
 A scientific-plate projection, structured as overview-first drilldown (Shneiderman: overview → zoom & filter → details on demand), each level fed by an existing query:
 
-- **L0 overview**: title block (vault, counts, updated), charter, FIG. 1 — the kind-level condensation (`architecture`) as a deterministic circular plate with aggregated, labeled edges; kind legend with deterministic muted tints (no kind has a reserved color — palette cycles in declaration order).
+- **L0 overview**: title block (vault, counts, updated), charter, FIG. 1 — the **architecture matrix** (`architecture`): kinds × kinds, each cell listing the relation types flowing row→column with edge counts, diagonal shaded for self-relations, headers carrying swatch + entity count. A matrix stays legible at any edge density — the circular node-link plate it replaced collapsed into label soup on dense vaults. Kind tints are deterministic muted washes (no kind has a reserved color — the palette cycles in declaration order).
 - **L1 kind register**: the kind's authoring guide, its connection spectrum, and a ruled list of entities (title · first sentence · tags); multi-select with a bulk copy-refs bar.
 - **L2 entry**: prose body as the protagonist (serif, ≤68ch), ref + copy, source anchors, file path; FIG. — the **grouped axial neighborhood** (inbound | center | outbound, grouped by relation type — the group header carries the label once, member lines stay silent; depth 1–2) replacing the earlier Mermaid idea; grouped edge lists with notes.
 
