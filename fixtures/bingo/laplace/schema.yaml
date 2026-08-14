@@ -1,0 +1,88 @@
+apiVersion: laplace/v1
+name: bingo
+title: bingo · Rust 本地 agent harness
+charter:
+  - 改动某个模块，哪些模块、子系统和不变量必须跟着重看？
+  - 一个新 session 在读任何源码之前，如何最快建立 bingo 的架构图景？
+  - 某个契约（trait / 线协议 / 磁盘格式）改了，谁定义它、谁实现它、谁消费它？
+  - 一次用户输入到一次真实副作用之间，要穿过哪些关卡？
+  - 某条不变量在约束哪些代码？谁最容易违反它？
+ignore:
+  - "target/**"
+  - ".bingo/**"
+  - "notes/design/opencode-source/**"
+  - "assets/**"
+  - "Cargo.lock"
+  - "scripts/__pycache__/**"
+  - "**/*.lock"
+kinds:
+  module:
+    description: >-
+      一个 Rust 模块（单文件或 mod 目录）。描述应写：它为什么存在、负责什么边界、
+      和别的模块有什么约定、历史包袱在哪。不复述文件里有哪些函数——那是 grep 的活。
+      名字跟随源码标识符；src 的一级子目录用 namespace（api / tool / tui）。
+  subsystem:
+    description: >-
+      跨多个模块的能力单元，也是人在对话里真正称呼的那个名字（"多 agent"、"渲染层"）。
+      描述应写：这个能力由哪几块拼成、它对外承诺什么、内部哪一处最容易塌。
+      只有当没有单一模块能代表这个能力时才立子系统，否则用 module。
+  contract:
+    description: >-
+      被独立消费的边界：trait、跨进程线协议、或磁盘持久化格式（AGENTS.md 的契约优先规则）。
+      描述应写：谁定义、谁实现、谁消费、破坏兼容性的后果是什么、有没有版本纪律。
+      判据是"改它会波及仓库以外或另一进程"，内部重构不立契约。
+  invariant:
+    description: >-
+      一条必须成立的规则，违反它产生的是一类 bug 而不是风格问题。
+      描述应写：规则原文、为什么立（通常有事故史）、违反时以什么症状暴露、谁在守它。
+      这是这张图相对源码最大的增量——代码里读不出"不许这么做"。
+relations:
+  depends-on:
+    description: >-
+      A depends-on B —— A 是消费方，B 是被依赖方。A 的正确性建立在 B 当前行为之上。
+      读法：改 B 要回头看 A；改 A 不必惊动 B。
+    propagation: to-source
+    from: [module, subsystem]
+    to: [module, subsystem]
+  part-of:
+    description: >-
+      A part-of B —— A 是成员，B 是包含它的整体（模块归属子系统，子系统归属更大的子系统）。
+      读法：子系统的设计变了，每个成员都要重看；成员变了，子系统的说法也可能不再成立。
+    propagation: both
+    from: [module, subsystem]
+    to: [subsystem]
+  defines:
+    description: >-
+      A defines B —— A 是契约定义所在的代码，B 是契约。定义和拥有者是同一处，耦合是身份级的。
+      读法：改契约就是改 A；改 A 里契约那部分就是改契约。两边互相波及。
+    propagation: both
+    from: [module, subsystem]
+    to: [contract]
+  implements:
+    description: >-
+      A implements B —— A 是实现方（适配器 / 后端），B 是它必须满足的契约。
+      读法：契约变了，每个实现都要跟着改；单个实现改了，契约不必动。
+    propagation: to-source
+    from: [module, subsystem]
+    to: [contract]
+  consumes:
+    description: >-
+      A consumes B —— A 是消费方（读取、写入或依赖 B 的形状），B 是被消费的契约。
+      读法：契约变了要通知所有消费方；消费方内部改动不惊动契约。
+    propagation: to-source
+    from: [module, subsystem]
+    to: [contract]
+  binds:
+    description: >-
+      A binds B —— A 是不变量（规则），B 是必须遵守它的代码。关系挂在不变量一侧，因为规则少、被约束者多。
+      读法：B 改了要回头问"这条规则还成立吗"；规则本身被修订或放宽，每个被约束者都要重新对照。
+    propagation: both
+    from: [invariant]
+    to: [module, subsystem, contract]
+  gates:
+    description: >-
+      A gates B —— A 是关卡，B 是被关卡拦住的东西；到 B 的每次调用都先过 A。
+      读法：B 的名字、入参或能力变了，关卡的判定表要跟着修；关卡自己改判定，B 的代码不必动。
+    propagation: to-source
+    from: [module, subsystem]
+    to: [module, subsystem, contract]
