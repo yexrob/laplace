@@ -373,6 +373,7 @@ pub fn schema(g: &Graph) -> Value {
 pub fn export(g: &Graph) -> Value {
     json!({
         "schema": schema(g),
+        "updated": crate::summary::vault_updated_date(g.vault),
         "counts": { "entities": g.vault.entities.len(), "edges": g.edges.len() },
         "nodes": g.vault.entities.iter().map(|e| json!({
             "ref": e.eref.to_string(),
@@ -384,6 +385,8 @@ pub fn export(g: &Graph) -> Value {
             "lifecycle": e.fm.lifecycle,
             "summary": e.first_sentence(),
             "file": e.file,
+            "source": e.fm.source,
+            "body": e.body.trim(),
         })).collect::<Vec<_>>(),
         "edges": g.edges.iter().map(|e| {
             let mut v = json!({

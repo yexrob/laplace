@@ -180,6 +180,11 @@ fn git_out(vault: &Vault, args: &[&str]) -> Option<String> {
         .filter(|s| !s.is_empty())
 }
 
+/// Last vault commit date (short), for title blocks and export.
+pub fn vault_updated_date(vault: &Vault) -> Option<String> {
+    vault_updated(vault)
+}
+
 fn vault_updated(vault: &Vault) -> Option<String> {
     git_out(
         vault,

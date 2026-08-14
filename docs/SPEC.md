@@ -263,11 +263,21 @@ laplace drift [--since REV]          §6
 laplace summary [--budget N]         §7; default budget 1200 tokens (CJK-aware estimation)
 laplace skill show|install [--to DIR]  §8
 laplace export                       full graph JSON to stdout (same payload as /api/graph)
-laplace serve [--port 6174]          read-only HTML view: list/search/filter, detail, 1–2 hop Mermaid neighborhood, copy-ref
+laplace serve [--port 6174]          read-only HTML view; see §9a
 laplace mcp [--scan DIR]             MCP server on stdio (17 tools); --scan serves every vault under DIR
 ```
 
 Global: `--vault DIR`. Deliberate non-tools: no `fmt` (nothing to format — writes are already canonical, bodies are prose), no `watch` (lazy rebuild), no `stats` (`architecture` is it), no raw-file write (semantic operations only).
+
+### 9a. The view (`laplace serve`)
+
+A scientific-plate projection, structured as overview-first drilldown (Shneiderman: overview → zoom & filter → details on demand), each level fed by an existing query:
+
+- **L0 overview**: title block (vault, counts, updated), charter, FIG. 1 — the kind-level condensation (`architecture`) as a deterministic circular plate with aggregated, labeled edges; kind legend with deterministic muted tints (no kind has a reserved color — palette cycles in declaration order).
+- **L1 kind register**: the kind's authoring guide, its connection spectrum, and a ruled list of entities (title · first sentence · tags); multi-select with a bulk copy-refs bar.
+- **L2 entry**: prose body as the protagonist (serif, ≤68ch), ref + copy, source anchors, file path; FIG. — the **grouped axial neighborhood** (inbound | center | outbound, grouped by relation type — the group header carries the label once, member lines stay silent; depth 1–2) replacing the earlier Mermaid idea; grouped edge lists with notes.
+
+Mechanics: GET-only tiny_http, two routes (`/` embedded shell, `/api/graph` = export payload + `ok`/`warnings`), vault reloaded per request, hash-routed SPA (`#/k/<kind>`, `#/e/<ref>` — shareable, back-button friendly), search-anywhere wormhole, `/` focus · `Esc` up · `c` copy keys. A broken vault renders its diagnostics — no projections of a broken truth. Zero external dependencies; system font stacks; light plate materials (paper/ink/hairlines/Prussian-blue accent), dark tokens reserved.
 
 ## 10. Versioning & compatibility
 

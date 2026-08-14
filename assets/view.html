@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Laplace</title>
+<style>
+  :root {
+    --paper: #FAF9F6;
+    --ink: #1F2328;
+    --ink-2: #6A6F76;
+    --hair: #DCD8CF;
+    --hair-soft: #EAE7E0;
+    --accent: #1D4E89;
+    --accent-wash: rgba(29, 78, 137, 0.07);
+    --serif: ui-serif, Georgia, "Songti SC", "Noto Serif CJK SC", serif;
+    --sans: system-ui, -apple-system, "PingFang SC", sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; border-radius: 0 !important; }
+  html { background: var(--paper); }
+  body {
+    font-family: var(--serif);
+    color: var(--ink);
+    background: var(--paper);
+    font-size: 15px;
+    line-height: 1.65;
+  }
+  a { color: inherit; text-decoration: none; }
+  button {
+    font: inherit; background: none; border: none; color: inherit; cursor: pointer;
+  }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  ::selection { background: var(--accent-wash); }
+
+  .lbl {
+    font-family: var(--sans);
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+  }
+  .mono { font-family: var(--mono); font-size: 12.5px; }
+  .dim { color: var(--ink-2); }
+
+  /* ── title block ─────────────────────────────────────────── */
+  header {
+    display: flex; align-items: baseline; gap: 18px;
+    padding: 14px 28px 12px;
+    border-bottom: 1px solid var(--ink);
+  }
+  header .brand { font-family: var(--mono); font-size: 12px; letter-spacing: 0.22em; }
+  header .brand a { color: var(--ink); }
+  header h1 { font-size: 19px; font-weight: 600; letter-spacing: 0.01em; }
+  header .stats { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+  header .searchbox { position: relative; }
+  header input {
+    font-family: var(--mono); font-size: 12.5px;
+    border: 1px solid var(--hair); background: transparent; color: var(--ink);
+    padding: 5px 9px; width: 230px;
+  }
+  header input::placeholder { color: var(--ink-2); }
+
+  #warnbar {
+    padding: 4px 28px; border-bottom: 1px solid var(--hair);
+    font-family: var(--mono); font-size: 11.5px; color: var(--ink-2);
+  }
+  #crumbs {
+    padding: 10px 28px; border-bottom: 1px solid var(--hair);
+    font-family: var(--mono); font-size: 12px; color: var(--ink-2);
+  }
+  #crumbs a:hover { color: var(--accent); }
+  #crumbs .here { color: var(--ink); }
+
+  main { padding: 26px 28px 80px; max-width: 1180px; margin: 0 auto; }
+
+  section { margin-bottom: 34px; }
+  .sect-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px;
+               padding-bottom: 5px; border-bottom: 1px solid var(--hair); }
+
+  .figure { border: 1px solid var(--hair); padding: 10px; }
+  .figcap {
+    margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--hair-soft);
+    font-family: var(--mono); font-size: 11px; color: var(--ink-2);
+  }
+
+  /* ── L0 ──────────────────────────────────────────────────── */
+  .charter { max-width: 72ch; }
+  .charter li { margin: 4px 0 4px 1.2em; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; }
+  .legend button { display: inline-flex; align-items: center; gap: 7px;
+                   font-family: var(--mono); font-size: 12.5px; padding: 3px 2px; }
+  .legend button:hover { color: var(--accent); }
+  .swatch { width: 10px; height: 10px; border: 1px solid var(--ink-2); display: inline-block; }
+  .smallprint { font-size: 13px; color: var(--ink-2); max-width: 72ch; }
+  .smallprint li { margin-left: 1.2em; }
+
+  /* ── L1 ──────────────────────────────────────────────────── */
+  .kind-guide { font-size: 13.5px; color: var(--ink-2); max-width: 70ch; margin: 4px 0 2px; }
+  .spectrum { font-family: var(--mono); font-size: 12px; color: var(--ink-2);
+              margin: 10px 0 0; line-height: 1.9; }
+  .rows { border-top: 1px solid var(--hair); margin-top: 14px; }
+  .row { display: grid; grid-template-columns: 26px minmax(140px, 220px) 1fr auto;
+         gap: 12px; align-items: baseline;
+         padding: 9px 4px; border-bottom: 1px solid var(--hair); cursor: pointer; }
+  .row:hover { background: var(--accent-wash); }
+  .row .name { font-weight: 600; }
+  .row .sum { font-size: 13.5px; color: var(--ink-2);
+              overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .tags { font-family: var(--mono); font-size: 11px; color: var(--ink-2); white-space: nowrap; }
+  .row input[type=checkbox] { accent-color: var(--accent); }
+
+  #selbar {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    background: var(--paper); border-top: 1px solid var(--ink);
+    padding: 9px 28px; display: flex; gap: 22px; align-items: center;
+    font-family: var(--mono); font-size: 12.5px;
+  }
+  #selbar button { color: var(--accent); letter-spacing: 0.08em; }
+
+  /* ── L2 ──────────────────────────────────────────────────── */
+  .entry-grid { display: grid; grid-template-columns: minmax(380px, 7fr) minmax(340px, 5fr);
+                gap: 40px; align-items: start; }
+  @media (max-width: 900px) { .entry-grid { grid-template-columns: 1fr; } }
+  .entry h2 { font-size: 26px; font-weight: 650; line-height: 1.25; }
+  .refline { display: flex; align-items: center; gap: 10px; margin: 6px 0 2px; }
+  .metaline { display: flex; align-items: center; gap: 10px; margin: 2px 0 14px;
+              font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
+  .copybtn { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em;
+             color: var(--accent); border: 1px solid var(--hair); padding: 2px 8px; }
+  .copybtn:hover { border-color: var(--accent); }
+  .prose { max-width: 68ch; padding: 16px 0; border-top: 1px solid var(--hair); }
+  .prose p { margin: 0 0 12px; }
+  .prose h4 { font-family: var(--sans); font-size: 13px; margin: 14px 0 6px; }
+  .prose code { font-family: var(--mono); font-size: 0.88em; background: var(--hair-soft); padding: 0 4px; }
+  .prose ul { margin: 0 0 12px 1.3em; }
+  .anchors { border-top: 1px solid var(--hair); padding-top: 10px; }
+  .anchors .mono { display: block; margin-top: 3px; }
+  .edges-list { margin-top: 18px; }
+  .edges-list .group { margin-bottom: 12px; }
+  .edges-list .entrylink { display: block; padding: 3px 0 3px 14px; }
+  .edges-list .entrylink:hover { color: var(--accent); }
+  .edges-list .note { font-size: 13px; color: var(--ink-2); font-style: italic; }
+  .depth-toggle { display: inline-flex; gap: 0; margin-left: auto; }
+  .depth-toggle button { font-family: var(--mono); font-size: 11px; padding: 2px 9px;
+                         border: 1px solid var(--hair); color: var(--ink-2); }
+  .depth-toggle button.on { color: var(--paper); background: var(--ink); border-color: var(--ink); }
+
+  /* ── search dropdown ─────────────────────────────────────── */
+  #hits {
+    position: absolute; top: 30px; right: 0; width: 380px; z-index: 5;
+    background: var(--paper); border: 1px solid var(--ink); display: none;
+    max-height: 380px; overflow-y: auto;
+  }
+  #hits .hit { display: block; width: 100%; text-align: left; padding: 7px 10px;
+               border-bottom: 1px solid var(--hair-soft); }
+  #hits .hit:hover, #hits .hit.focus { background: var(--accent-wash); }
+  #hits .hit .sum { font-size: 12.5px; color: var(--ink-2); display: block;
+                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  svg text { font-family: var(--mono); fill: var(--ink); }
+  svg .edge { stroke: var(--ink-2); stroke-width: 1; fill: none; }
+  svg .edge.faint { stroke: var(--hair); }
+  svg .edgelbl { font-size: 10px; fill: var(--ink-2); paint-order: stroke;
+                 stroke: var(--paper); stroke-width: 3px; }
+  svg .node { cursor: pointer; }
+  svg .node:hover rect, svg .node:hover circle { stroke: var(--accent); }
+  .errbox { border: 1px solid var(--ink); padding: 16px 20px; }
+  .errbox pre { font-family: var(--mono); font-size: 12px; white-space: pre-wrap;
+                margin-top: 10px; color: var(--ink-2); }
+  .flash { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <span class="brand"><a href="#/">LAPLACE</a></span>
+  <h1 id="vault-title">…</h1>
+  <span class="stats" id="stats"></span>
+  <span class="searchbox">
+    <input id="q" type="search" placeholder="/ search" autocomplete="off">
+    <div id="hits"></div>
+  </span>
+</header>
+<div id="warnbar" hidden></div>
+<nav id="crumbs" hidden></nav>
+<main id="main"></main>
+<div id="selbar" hidden></div>
+
+<script>
+"use strict";
+/* Deterministic muted plate tints, assigned by kind order. */
+const TINTS = ["#6E8CA0","#A0846E","#7C9A7C","#9A7C90","#8F8F6A","#6E9A96","#9A8A6E","#84788F"];
+
+let D = null;              // /api/graph payload
+let kindTint = {};         // kind -> tint
+let byRef = {};            // ref -> node
+let inEdges = {}, outEdges = {}; // ref -> [edge]
+let symRels = new Set();
+let selected = new Set();  // multi-select refs (L1)
+let depth = 1;             // neighborhood depth
+
+const $ = (id) => document.getElementById(id);
+const elide = (ref) => ref.replace(":default/", ":");
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+async function boot() {
+  const r = await fetch("/api/graph");
+  D = await r.json();
+  if (!D.ok) { renderInvalid(); return; }
+  document.title = D.schema.title || D.schema.name;
+  $("vault-title").textContent = D.schema.title || D.schema.name;
+  $("stats").textContent =
+    `${D.counts.entities} ENTITIES · ${D.counts.edges} RELATIONS` + (D.updated ? ` · ${D.updated}` : "");
+  if (D.warnings > 0) {
+    $("warnbar").hidden = false;
+    $("warnbar").textContent = "⚠ " + D.warnings + " warnings — run 'laplace validate' for the list";
+  }
+  D.schema.kinds.forEach((k, i) => kindTint[k.kind] = TINTS[i % TINTS.length]);
+  for (const rel of D.schema.relations) if (rel.symmetric) symRels.add(rel.relation);
+  for (const n of D.nodes) { byRef[n.ref] = n; inEdges[n.ref] = []; outEdges[n.ref] = []; }
+  for (const e of D.edges) { outEdges[e.from].push(e); inEdges[e.to].push(e); }
+  window.addEventListener("hashchange", route);
+  route();
+}
+
+/* ── router ─────────────────────────────────────────────────── */
+function route() {
+  const h = decodeURIComponent(location.hash);
+  selected.clear(); renderSelbar();
+  if (h.startsWith("#/e/")) renderEntity(h.slice(4));
+  else if (h.startsWith("#/k/")) renderKind(h.slice(4));
+  else renderOverview();
+  window.scrollTo(0, 0);
+}
+function crumbs(parts) {
+  const el = $("crumbs");
+  if (!parts.length) { el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = ['<a href="#/">OVERVIEW</a>']
+    .concat(parts.map(p => p.href ? `<a href="${p.href}">${esc(p.text)}</a>` : `<span class="here">${esc(p.text)}</span>`))
+    .join(" › ");
+}
+
+/* ── L0: the overview plate ─────────────────────────────────── */
+function renderOverview() {
+  crumbs([]);
+  const s = D.schema;
+  const charter = s.charter.length
+    ? `<section class="charter"><div class="sect-head"><span class="lbl">Charter — why this map exists</span></div>
+       <ul>${s.charter.map(c => `<li>${esc(c)}</li>`).join("")}</ul></section>` : "";
+  const counts = {};
+  for (const n of D.nodes) counts[n.kind] = (counts[n.kind] || 0) + 1;
+  const legend = s.kinds.map(k =>
+    `<button onclick="location.hash='#/k/${encodeURIComponent(k.kind)}'">
+       <span class="swatch" style="background:${kindTint[k.kind]}"></span>${esc(k.kind)} · ${counts[k.kind] || 0}
+     </button>`).join("");
+  const extras = [];
+  if (s.exclusions.length)
+    extras.push(`<div class="sect-head"><span class="lbl">Exclusions — deliberately not mapped</span></div>
+                 <ul>${s.exclusions.map(x => `<li>${esc(x)}</li>`).join("")}</ul>`);
+  $("main").innerHTML = `
+    ${charter}
+    <section>
+      <div class="sect-head"><span class="lbl">Fig. 1 — Architecture (kind-level condensation)</span></div>
+      <div class="figure">${condensationSVG()}<div class="legend">${legend}</div>
+        <div class="figcap">${s.kinds.length} kinds · ${D.counts.edges} relations aggregated by type — click a kind to open its register</div>
+      </div>
+    </section>
+    ${extras.length ? `<section class="smallprint">${extras.join("")}</section>` : ""}`;
+}
+
+/* Circular deterministic layout: kinds on a ring, aggregated edges as arcs. */
+function condensationSVG() {
+  const kinds = D.schema.kinds.map(k => k.kind);
+  const counts = {};
+  for (const n of D.nodes) counts[n.kind] = (counts[n.kind] || 0) + 1;
+  const agg = {}; // "a|b" -> [{rel, n, from, to}]
+  for (const e of D.edges) {
+    const a = byRef[e.from].kind, b = byRef[e.to].kind;
+    const key = a + "|" + e.rel + "|" + b;
+    agg[key] = agg[key] || { from: a, to: b, rel: e.rel, n: 0 };
+    agg[key].n++;
+  }
+  const W = 860, H = 430, cx = W / 2, cy = H / 2, R = Math.min(W, H) / 2 - 74;
+  const pos = {};
+  kinds.forEach((k, i) => {
+    const a = -Math.PI / 2 + (2 * Math.PI * i) / kinds.length;
+    pos[k] = { x: cx + R * Math.cos(a), y: cy + R * Math.sin(a) };
+  });
+  const rOf = (k) => 12 + Math.sqrt(counts[k] || 1) * 3.4;
+  let defs = `<defs><marker id="arr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+    <path d="M0,0 L8,4 L0,8 z" fill="#6A6F76"/></marker></defs>`;
+  let edges = "", labels = "";
+  const groups = Object.values(agg);
+  const pairIdx = {};
+  for (const g of groups) {
+    const p1 = pos[g.from], p2 = pos[g.to];
+    if (!p1 || !p2) continue;
+    if (g.from === g.to) { // self-loop: arc above, label pushed away from the ring's center
+      const r = rOf(g.from);
+      const x = p1.x, y = p1.y - r;
+      const outward = p1.x >= cx;
+      edges += `<path class="edge" marker-end="url(#arr)" d="M ${x - 6} ${y} C ${x - 30} ${y - 40}, ${x + 30} ${y - 40}, ${x + 6} ${y}"/>`;
+      labels += `<text class="edgelbl" x="${x + (outward ? 34 : -34)}" y="${y - 34}"
+                   text-anchor="${outward ? "start" : "end"}">${esc(g.rel)} ×${g.n}</text>`;
+      continue;
+    }
+    const pk = [g.from, g.to].sort().join("|");
+    const idx = (pairIdx[pk] = (pairIdx[pk] || 0) + 1) - 1;
+    const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
+    const dx = p2.x - p1.x, dy = p2.y - p1.y, len = Math.hypot(dx, dy) || 1;
+    // Parallel edges fan out on alternating sides, wide enough to keep labels apart.
+    const off = (idx % 2 === 0 ? 1 : -1) * (24 + 30 * Math.floor(idx / 2));
+    const nx = -dy / len, ny = dx / len;
+    const qx = mx + nx * off, qy = my + ny * off;
+    // trim endpoints to node radius
+    const r1 = rOf(g.from), r2 = rOf(g.to);
+    const t1 = r1 / len, t2 = 1 - (r2 + 4) / len;
+    const sx = p1.x + dx * t1, sy = p1.y + dy * t1;
+    const ex = p1.x + dx * t2, ey = p1.y + dy * t2;
+    edges += `<path class="edge" marker-end="url(#arr)" d="M ${sx} ${sy} Q ${qx} ${qy} ${ex} ${ey}"/>`;
+    // Label sits at t=0.28 along the curve — near the source, off the crowded center.
+    const lt = 0.40, omt = 1 - lt;
+    const lx = omt * omt * sx + 2 * omt * lt * qx + lt * lt * ex;
+    const ly = omt * omt * sy + 2 * omt * lt * qy + lt * lt * ey;
+    labels += `<text class="edgelbl" x="${lx}" y="${ly - 3}" text-anchor="middle">${esc(g.rel)} ×${g.n}</text>`;
+  }
+  let nodes = "";
+  for (const k of kinds) {
+    const p = pos[k], r = rOf(k);
+    nodes += `<g class="node" onclick="location.hash='#/k/${encodeURIComponent(k)}'">
+      <circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${kindTint[k]}22" stroke="${kindTint[k]}" stroke-width="1.2"/>
+      <text x="${p.x}" y="${p.y + r + 15}" text-anchor="middle" font-size="12">${esc(k)}</text>
+      <text x="${p.x}" y="${p.y + 4}" text-anchor="middle" font-size="11" fill="#6A6F76">${counts[k] || 0}</text>
+    </g>`;
+  }
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="architecture">${defs}${edges}${labels}${nodes}</svg>`;
+}
+
+/* ── L1: the kind register ──────────────────────────────────── */
+function renderKind(kind) {
+  const decl = D.schema.kinds.find(k => k.kind === kind);
+  if (!decl) { $("main").innerHTML = `<p class="dim">no such kind: ${esc(kind)}</p>`; crumbs([{text: kind}]); return; }
+  crumbs([{ text: kind }]);
+  const nodes = D.nodes.filter(n => n.kind === kind).sort((a, b) => a.name.localeCompare(b.name, "zh"));
+  const guide = (decl.description || "").slice((decl.label || "").length).trim();
+  // connection spectrum from aggregated edges
+  const spec = {};
+  for (const e of D.edges) {
+    const a = byRef[e.from].kind, b = byRef[e.to].kind;
+    if (a === kind) { const k = `→ ${e.rel} ${b}`; spec[k] = (spec[k] || 0) + 1; }
+    if (b === kind && a !== kind) { const k = `← ${e.rel} ${a}`; spec[k] = (spec[k] || 0) + 1; }
+  }
+  const spectrum = Object.entries(spec).sort((x, y) => y[1] - x[1])
+    .map(([k, n]) => `${esc(k)} ×${n}`).join("&ensp;·&ensp;");
+  $("main").innerHTML = `
+    <section>
+      <div class="sect-head">
+        <span class="swatch" style="background:${kindTint[kind]}"></span>
+        <h2 style="font-size:20px">${esc(kind)}</h2>
+        <span class="mono dim">${nodes.length} entities</span>
+        <span class="lbl" style="margin-left:auto">${esc(decl.label || "")}</span>
+      </div>
+      ${guide ? `<p class="kind-guide">${esc(guide)}</p>` : ""}
+      ${spectrum ? `<p class="spectrum">${spectrum}</p>` : ""}
+      <div class="rows">${nodes.map(rowHTML).join("")}</div>
+    </section>`;
+  renderSelbar();
+}
+function rowHTML(n) {
+  return `<div class="row" onclick="location.hash='#/e/${encodeURIComponent(n.ref)}'">
+    <input type="checkbox" aria-label="select ${esc(n.ref)}" onclick="event.stopPropagation();toggleSel('${esc(n.ref)}', this.checked)">
+    <span class="name">${esc(n.title || n.name)}</span>
+    <span class="sum">${esc(n.summary)}</span>
+    <span class="tags">${n.tags.map(esc).join(" · ")}</span>
+  </div>`;
+}
+function toggleSel(ref, on) {
+  if (on) selected.add(ref); else selected.delete(ref);
+  renderSelbar();
+}
+function renderSelbar() {
+  const bar = $("selbar");
+  if (!selected.size) { bar.hidden = true; return; }
+  bar.hidden = false;
+  bar.innerHTML = `<span>${selected.size} selected</span>
+    <button onclick="copyText(Array.from(selected).join(' '), this)">COPY REFS</button>
+    <button onclick="selected.clear();route()">CLEAR</button>`;
+}
+
+/* ── L2: the entry plate ────────────────────────────────────── */
+function renderEntity(ref) {
+  const n = byRef[ref];
+  if (!n) { $("main").innerHTML = `<p class="dim">no such entity: ${esc(ref)}</p>`; crumbs([{text: ref}]); return; }
+  crumbs([{ text: n.kind, href: `#/k/${encodeURIComponent(n.kind)}` }, { text: n.title || n.name }]);
+  const meta = [
+    `<span class="swatch" style="background:${kindTint[n.kind]}"></span> ${esc(n.kind)}`,
+    n.tags.length ? esc(n.tags.join(" · ")) : null,
+    n.lifecycle ? `lifecycle: ${esc(n.lifecycle)}` : null,
+  ].filter(Boolean).join("&ensp;·&ensp;");
+  const anchors = n.source.length
+    ? `<div class="anchors"><span class="lbl">Source anchors</span>${n.source.map(s => `<span class="mono dim">${esc(s)}</span>`).join("")}</div>`
+    : "";
+  $("main").innerHTML = `
+    <div class="entry-grid">
+      <article class="entry">
+        <h2>${esc(n.title || n.name)}</h2>
+        <div class="refline"><span class="mono">${esc(n.ref)}</span>
+          <button class="copybtn" onclick="copyText('${esc(n.ref)}', this)">COPY REF</button></div>
+        <div class="metaline">${meta}</div>
+        <div class="prose">${miniMD(n.body)}</div>
+        ${anchors}
+        <p class="mono dim" style="margin-top:10px;font-size:11px">${esc(n.file)}</p>
+      </article>
+      <aside>
+        <div class="sect-head"><span class="lbl">Fig. — Neighborhood</span>
+          <span class="depth-toggle">
+            <button class="${depth === 1 ? "on" : ""}" onclick="depth=1;route()">1 HOP</button>
+            <button class="${depth === 2 ? "on" : ""}" onclick="depth=2;route()">2 HOPS</button>
+          </span></div>
+        <div class="figure">${axialSVG(n)}</div>
+        ${edgesListHTML(n)}
+      </aside>
+    </div>`;
+}
+
+/* Axial neighborhood: inbound | center | outbound, grouped by relation.
+   Group headers carry the label once; member lines stay silent. */
+function axialSVG(center) {
+  const inn = inEdges[center.ref].map(e => ({ other: e.from, rel: e.rel, sym: symRels.has(e.rel) }));
+  const out = outEdges[center.ref].map(e => ({ other: e.to, rel: e.rel, sym: symRels.has(e.rel) }));
+  const groupBy = (list) => {
+    const g = {};
+    for (const e of list) (g[e.rel] = g[e.rel] || []).push(e.other);
+    return Object.entries(g).sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0], "zh"))
+      .map(([rel, refs]) => ({ rel, refs: refs.sort((a, b) => a.localeCompare(b, "zh")) }));
+  };
+  const left = groupBy(inn.filter(x => !x.sym));
+  const right = groupBy(out.concat(inn.filter(x => x.sym)));
+  if (!left.length && !right.length)
+    return `<p class="dim" style="padding:6px">isolated entry — no relations either way</p>`;
+
+  const ROW = 30, HEAD = 22, PAD = 10, BW = 172, BH = 24, GAP = 96, OUTER = 128;
+  const sideH = (gs) => gs.reduce((h, g) => h + HEAD + g.refs.length * ROW + PAD, 0);
+  const H = Math.max(sideH(left), sideH(right), 90) + 16;
+  const W = BW * 3 + GAP * 2 + 8;
+  const cxL = 4, cxC = BW + GAP + 4, cxR = 2 * (BW + GAP) + 4, cyC = H / 2;
+
+  let s = "";
+  const seen = new Set([center.ref]);
+  left.forEach(g => g.refs.forEach(r => seen.add(r)));
+  right.forEach(g => g.refs.forEach(r => seen.add(r)));
+
+  const drawSide = (groups, x, isLeft) => {
+    let y = 8, out = "";
+    for (const g of groups) {
+      const head = isLeft ? `${g.rel} ×${g.refs.length} →` : `→ ${g.rel} ×${g.refs.length}`;
+      out += `<text x="${isLeft ? x + BW : x}" y="${y + 12}" font-size="10.5" fill="#6A6F76"
+                text-anchor="${isLeft ? "end" : "start"}" letter-spacing="1">${esc(head)}</text>`;
+      y += HEAD;
+      for (const ref of g.refs) {
+        const n = byRef[ref], tint = kindTint[n.kind];
+        const label = (n.title || n.name);
+        const disp = label.length > 12 ? label.slice(0, 11) + "…" : label;
+        out += `<line class="edge faint" x1="${isLeft ? x + BW : cxC + BW}" y1="${isLeft ? y + BH / 2 : cyC}"
+                  x2="${isLeft ? cxC - 4 : x - 4}" y2="${isLeft ? cyC : y + BH / 2}"/>`;
+        out += `<g class="node" onclick="location.hash='#/e/${encodeURIComponent(ref)}'">
+          <title>${esc(ref)}</title>
+          <rect x="${x}" y="${y}" width="${BW}" height="${BH}" fill="${tint}14" stroke="var(--hair)"/>
+          <rect x="${x}" y="${y}" width="3" height="${BH}" fill="${tint}"/>
+          <text x="${x + 10}" y="${y + BH / 2 + 4}" font-size="12">${esc(disp)}</text></g>`;
+        if (depth === 2) {
+          const nbrs = [...outEdges[ref], ...inEdges[ref]]
+            .map(e2 => (e2.from === ref ? e2.to : e2.from))
+            .filter(r2 => !seen.has(r2)).filter((r2, k, arr) => arr.indexOf(r2) === k).slice(0, 2);
+          nbrs.forEach((r2, j2) => {
+            const yy = y + BH / 2 + (j2 - (nbrs.length - 1) / 2) * 15;
+            const x1 = isLeft ? x : x + BW, x2 = isLeft ? x1 - 40 : x1 + 40;
+            const n2 = byRef[r2];
+            out += `<g class="node" opacity="0.55" onclick="location.hash='#/e/${encodeURIComponent(r2)}'">
+              <title>${esc(r2)}</title>
+              <line class="edge faint" x1="${x1}" y1="${y + BH / 2}" x2="${x2}" y2="${yy}"/>
+              <text x="${isLeft ? x2 - 4 : x2 + 4}" y="${yy + 3.5}" font-size="10"
+                text-anchor="${isLeft ? "end" : "start"}">${esc((n2.title || n2.name).slice(0, 8))}</text></g>`;
+          });
+        }
+        y += ROW;
+      }
+      y += PAD;
+    }
+    return out;
+  };
+  s += drawSide(left, cxL, true) + drawSide(right, cxR, false);
+  s += `<rect x="${cxC}" y="${cyC - BH / 2 - 2}" width="${BW}" height="${BH + 4}" fill="none" stroke="var(--ink)" stroke-width="1.2"/>
+        <text x="${cxC + 10}" y="${cyC + 4}" font-size="12.5" font-weight="600">${esc((center.title || center.name).slice(0, 12))}</text>`;
+  const ox = depth === 2 ? OUTER : 0;
+  return `<svg viewBox="${-ox} 0 ${W + ox * 2} ${H}" width="100%" role="img" aria-label="neighborhood">${s}</svg>`;
+}
+
+function edgesListHTML(n) {
+  const groups = {};
+  for (const e of outEdges[n.ref]) (groups[`${e.rel} →`] = groups[`${e.rel} →`] || []).push({ ref: e.to, note: e.note });
+  for (const e of inEdges[n.ref]) {
+    const k = symRels.has(e.rel) ? `${e.rel} →` : `← ${e.rel}`;
+    (groups[k] = groups[k] || []).push({ ref: e.from, note: e.note });
+  }
+  const keys = Object.keys(groups).sort((a, b) => a.localeCompare(b, "zh"));
+  if (!keys.length) return "";
+  return `<div class="edges-list">${keys.map(k => `
+    <div class="group"><span class="lbl">${esc(k)}</span>
+      ${groups[k].map(t => `<a class="entrylink" href="#/e/${encodeURIComponent(t.ref)}">
+        <span class="mono">${esc(elide(t.ref))}</span>${t.note ? `<span class="note"> — ${esc(t.note)}</span>` : ""}</a>`).join("")}
+    </div>`).join("")}</div>`;
+}
+
+/* ── invalid vault plate ────────────────────────────────────── */
+function renderInvalid() {
+  $("vault-title").textContent = "vault invalid";
+  $("main").innerHTML = `<div class="errbox">
+    <span class="lbl">No projections of a broken truth — ${D.errors} errors</span>
+    <pre>${esc(D.diagnostics.join("\n\n"))}</pre></div>`;
+}
+
+/* ── mini markdown (paragraphs, bold, italics, code, lists, h4) ── */
+function miniMD(text) {
+  const blocks = text.split(/\n{2,}/);
+  return blocks.map(b => {
+    b = b.trim();
+    if (!b) return "";
+    if (b.startsWith("## ")) return `<h4>${inline(b.slice(3))}</h4>`;
+    if (b.split("\n").every(l => l.startsWith("- ")))
+      return `<ul>${b.split("\n").map(l => `<li>${inline(l.slice(2))}</li>`).join("")}</ul>`;
+    return `<p>${inline(b.replace(/\n/g, ""))}</p>`;
+  }).join("");
+  function inline(t) {
+    return esc(t)
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*([^*]+)\*/g, "<em>$1</em>")
+      .replace(/`([^`]+)`/g, "<code>$1</code>");
+  }
+}
+
+/* ── copy + search + keys ───────────────────────────────────── */
+function copyText(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    if (!btn) return;
+    const old = btn.textContent;
+    btn.textContent = "✓ COPIED";
+    btn.classList.add("flash");
+    setTimeout(() => { btn.textContent = old; btn.classList.remove("flash"); }, 900);
+  });
+}
+function score(n, q) {
+  const name = n.name.toLowerCase(), title = (n.title || "").toLowerCase();
+  if (name === q) return 100;
+  if (name.startsWith(q)) return 80;
+  if (name.includes(q)) return 60;
+  if (title.includes(q)) return 50;
+  if (n.tags.some(t => t.toLowerCase() === q)) return 40;
+  if (n.body.toLowerCase().includes(q)) return 20;
+  return 0;
+}
+$("q").addEventListener("input", () => {
+  const q = $("q").value.trim().toLowerCase();
+  const el = $("hits");
+  if (!q || !D || !D.ok) { el.style.display = "none"; return; }
+  const hits = D.nodes.map(n => [score(n, q), n]).filter(x => x[0] > 0)
+    .sort((a, b) => b[0] - a[0] || a[1].ref.localeCompare(b[1].ref, "zh")).slice(0, 12);
+  if (!hits.length) { el.innerHTML = `<div class="hit dim">no matches — try a name, tag, or body word</div>`; el.style.display = "block"; return; }
+  el.innerHTML = hits.map(([, n]) =>
+    `<button class="hit" data-ref="${esc(n.ref)}" onclick="goHit(this.dataset.ref)">
+       <span class="mono">${esc(elide(n.ref))}</span><span class="sum">${esc(n.summary)}</span></button>`).join("");
+  el.style.display = "block";
+});
+function goHit(ref) { $("hits").style.display = "none"; $("q").value = ""; location.hash = "#/e/" + encodeURIComponent(ref); }
+$("q").addEventListener("keydown", (ev) => {
+  if (ev.key === "Enter") { const b = $("hits").querySelector(".hit"); if (b && b.dataset.ref) goHit(b.dataset.ref); }
+  if (ev.key === "Escape") { $("hits").style.display = "none"; $("q").blur(); }
+});
+document.addEventListener("keydown", (ev) => {
+  if (ev.target.tagName === "INPUT") return;
+  if (ev.key === "/") { ev.preventDefault(); $("q").focus(); }
+  if (ev.key === "Escape") {
+    const h = decodeURIComponent(location.hash);
+    if (h.startsWith("#/e/")) { const n = byRef[h.slice(4)]; location.hash = n ? "#/k/" + encodeURIComponent(n.kind) : "#/"; }
+    else if (h.startsWith("#/k/")) location.hash = "#/";
+  }
+  if (ev.key === "c") {
+    const h = decodeURIComponent(location.hash);
+    if (h.startsWith("#/e/")) copyText(h.slice(4), null);
+  }
+});
+document.addEventListener("click", (ev) => {
+  if (!ev.target.closest(".searchbox")) $("hits").style.display = "none";
+});
+
+boot();
+</script>
+</body>
+</html>

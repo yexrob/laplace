@@ -8,6 +8,7 @@ pub mod model;
 pub mod ops;
 pub mod query;
 pub mod schema_ops;
+pub mod serve;
 pub mod skill;
 pub mod summary;
 pub mod validate;

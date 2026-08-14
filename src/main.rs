@@ -3,7 +3,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use laplace::graph::Graph;
-use laplace::{drift, mcp, ops, query, schema_ops, skill, summary, validate, vault};
+use laplace::{drift, mcp, ops, query, schema_ops, serve, skill, summary, validate, vault};
 use serde_json::Value;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -128,6 +128,11 @@ enum Cmd {
     /// The entity-map skill: print it, or install it into harness skill dirs.
     #[command(subcommand)]
     Skill(SkillCmd),
+    /// Read-only HTML view: overview plate, kind registers, entry pages.
+    Serve {
+        #[arg(long, default_value_t = 6174)]
+        port: u16,
+    },
     /// MCP server on stdio (17 tools).
     Mcp {
         /// Scan DIR (default ".") for every vault instead of serving one;
@@ -264,6 +269,10 @@ fn run(cli: Cli) -> Result<ExitCode> {
         return Ok(ExitCode::SUCCESS);
     }
     let dir = vault::discover(&cwd, cli.vault.as_deref())?;
+    if let Cmd::Serve { port } = &cli.cmd {
+        serve::serve(dir, *port)?;
+        return Ok(ExitCode::SUCCESS);
+    }
     let vault = vault::load(&dir)?;
 
     // The write operations and drift/export.
