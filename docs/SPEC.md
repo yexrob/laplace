@@ -237,7 +237,21 @@ If your work touches an entity (add/rename/remove/re-relate), update the map in 
 - **Token estimation is CJK-aware**: `ceil(ascii/4) + cjk + ceil(other/2)` (ASCII-calibrated ÷4 undercounts CJK badly — bingo#40's lesson).
 - The discipline lines are format contract — the skill and harnesses anchor on their presence.
 
-## 8. CLI surface
+## 8. The skill (delivery)
+
+One discipline, four focal lengths — the same doctrine folded to the moment it
+reaches the agent:
+
+| focal length | carrier | reaches the agent via |
+|---|---|---|
+| full text | `skill/entity-map/SKILL.md`, **embedded in the binary** (version-locked to the tool behavior it documents) | `laplace skill install` → `<skills-dir>/entity-map/SKILL.md` (the Claude Code / bingo shared convention); `laplace skill show` prints it |
+| one paragraph | MCP `initialize.instructions` | injected on connect by clients that honor it — the zero-install channel |
+| two lines | the summary's discipline footer (§7) | always in context wherever the summary is injected |
+| one line each | MCP tool descriptions | at tool-selection time |
+
+`laplace skill install` auto-detects existing harness directories (`~/.claude/skills`, `~/.config/bingo/skills`, project `./.claude/skills`, `./.bingo/skills`) or takes `--to DIR`; upgrading laplace and re-running install refreshes the text. No marketplace packaging in v1; no harness-specific variants — the discipline is universal, tool semantics live in the MCP descriptions.
+
+## 9. CLI surface
 
 ```
 laplace init                         scaffold laplace/schema.yaml (+ example entity) — only if absent
@@ -246,7 +260,8 @@ laplace schema <op>                  constitutional operations: add-kind/add-rel
 laplace validate [--json]
 laplace query <tool> …               §5
 laplace drift [--since REV]          §6
-laplace summary [--budget N]
+laplace summary [--budget N]         §7; default budget 1200 tokens (CJK-aware estimation)
+laplace skill show|install [--to DIR]  §8
 laplace export                       full graph JSON to stdout (same payload as /api/graph)
 laplace serve [--port 6174]          read-only HTML view: list/search/filter, detail, 1–2 hop Mermaid neighborhood, copy-ref
 laplace mcp [--scan DIR]             MCP server on stdio (17 tools); --scan serves every vault under DIR
@@ -254,11 +269,11 @@ laplace mcp [--scan DIR]             MCP server on stdio (17 tools); --scan serv
 
 Global: `--vault DIR`. Deliberate non-tools: no `fmt` (nothing to format — writes are already canonical, bodies are prose), no `watch` (lazy rebuild), no `stats` (`architecture` is it), no raw-file write (semantic operations only).
 
-## 9. Versioning & compatibility
+## 10. Versioning & compatibility
 
 `apiVersion: laplace/v1` in `schema.yaml` only. Additive evolution within v1; breaking changes bump the major and readers refuse unknown majors with a clear message. Reserved for later definition: per-kind attribute schemas (`kinds.<k>.attributes`), a dedicated `kinds.<k>.guide` field (meanwhile: first sentence = label, rest = guide), body wikilink parsing as implicit "mentions" edges, lifecycle vocabularies, relation inverse display names, namespace facets in `architecture`. Deliberately rejected (recorded so they stay rejected): cardinality constraints (a map is not a database), kind hierarchies (tags cover classification; two mechanisms would fight), inference rules (the engine stays dumb — reasoning is the model's job), tag vocabularies (freedom is the feature), **per-edge propagation overrides** (heterogeneity under the two-question test means the type should split — overrides would dissolve the type-level economy of judgment), **temporal edge models** (the map asserts the present; the vault's git history is the time axis).
 
-## 10. Implementation notes (non-normative)
+## 11. Implementation notes (non-normative)
 
 - Frontmatter: split on `---` fences, parse with the chosen YAML crate (`serde_yaml` is archived — evaluate saphyr-based bridges / `serde_norway` / `serde_yml` at implementation; needs serde derive + error positions).
 - Atomic writes: temp file + rename; multi-file transactions (rename op) stage all temps first.

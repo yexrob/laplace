@@ -3,7 +3,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use laplace::graph::Graph;
-use laplace::{drift, mcp, ops, query, schema_ops, validate, vault};
+use laplace::{drift, mcp, ops, query, schema_ops, skill, summary, validate, vault};
 use serde_json::Value;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -119,12 +119,33 @@ enum Cmd {
     },
     /// Full graph JSON to stdout — the jq/pipeline escape hatch.
     Export,
+    /// The context-injection block: entity index + relation digest + recent
+    /// changes, tiered to a token budget (CJK-aware estimation).
+    Summary {
+        #[arg(long, default_value_t = laplace::summary::DEFAULT_BUDGET)]
+        budget: usize,
+    },
+    /// The entity-map skill: print it, or install it into harness skill dirs.
+    #[command(subcommand)]
+    Skill(SkillCmd),
     /// MCP server on stdio (17 tools).
     Mcp {
         /// Scan DIR (default ".") for every vault instead of serving one;
         /// tools then take a `vault` selector, `laplace_vaults` lists them.
         #[arg(long, num_args = 0..=1, default_missing_value = ".")]
         scan: Option<PathBuf>,
+    },
+}
+
+#[derive(Subcommand)]
+enum SkillCmd {
+    /// Print the full skill text to stdout.
+    Show,
+    /// Install <dir>/entity-map/SKILL.md into detected harness skill
+    /// directories (~/.claude, ~/.config/bingo, ./.claude, ./.bingo), or --to DIR.
+    Install {
+        #[arg(long)]
+        to: Option<PathBuf>,
     },
 }
 
@@ -222,6 +243,17 @@ fn run(cli: Cli) -> Result<ExitCode> {
     let cwd = std::env::current_dir()?;
     if let Cmd::Init { name } = &cli.cmd {
         return init(&cwd, name.as_deref());
+    }
+    if let Cmd::Skill(sc) = &cli.cmd {
+        match sc {
+            SkillCmd::Show => print!("{}", skill::SKILL_TEXT),
+            SkillCmd::Install { to } => {
+                for path in skill::install(&cwd, to.as_deref())? {
+                    println!("installed {}", path.display());
+                }
+            }
+        }
+        return Ok(ExitCode::SUCCESS);
     }
     if let Cmd::Mcp { scan } = &cli.cmd {
         let mode = match scan {
@@ -358,6 +390,15 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 ExitCode::from(1)
             }
         });
+    }
+    if let Cmd::Summary { budget } = &cli.cmd {
+        let s = summary::render(&vault, *budget);
+        if cli.json {
+            println!("{}", serde_json::to_string_pretty(&summary::to_json(&s))?);
+        } else {
+            println!("{}", s.text);
+        }
+        return Ok(ExitCode::SUCCESS);
     }
     if let Cmd::Drift { since } = &cli.cmd {
         let v = drift::run(&vault, since.as_deref())?;

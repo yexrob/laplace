@@ -87,6 +87,13 @@ fn mcp_lists_17_tools_queries_and_writes() {
         json!({ "protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": { "name": "t", "version": "0" } }),
     );
     assert_eq!(init["result"]["serverInfo"]["name"], "laplace");
+    // The zero-install discipline channel rides the handshake.
+    assert!(
+        init["result"]["instructions"]
+            .as_str()
+            .is_some_and(|i| i.contains("laplace_schema")),
+        "{init}"
+    );
 
     let tools = s.request("tools/list", json!({}));
     let list = tools["result"]["tools"].as_array().unwrap();

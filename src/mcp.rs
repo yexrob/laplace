@@ -1,5 +1,6 @@
 //! MCP server on stdio (SPEC §5): newline-delimited JSON-RPC, tools only.
-//! Sixteen tools — seven queries, validate, drift, six write ops, schema_edit.
+//! Seventeen tools — seven queries, validate, drift, six write ops, schema_edit,
+//! vaults — plus the skill's compact distillation as initialize `instructions`.
 //! The vault is reloaded per call: a full rebuild is milliseconds, and always
 //! correct beats cleverly cached.
 
@@ -127,6 +128,9 @@ pub fn serve(mode: McpMode) -> Result<()> {
                 "protocolVersion": msg["params"]["protocolVersion"].as_str().unwrap_or("2024-11-05"),
                 "capabilities": { "tools": { "listChanged": false } },
                 "serverInfo": { "name": "laplace", "version": env!("CARGO_PKG_VERSION") },
+                // The zero-install discipline channel: clients that honor
+                // instructions inject this into model context on connect.
+                "instructions": crate::skill::MCP_INSTRUCTIONS,
             }),
             "ping" => json!({}),
             "tools/list" => json!({ "tools": tool_defs() }),
