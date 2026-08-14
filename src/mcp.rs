@@ -1,5 +1,5 @@
 //! MCP server on stdio (SPEC §5): newline-delimited JSON-RPC, tools only.
-//! Seventeen tools — seven queries, validate, drift, six write ops, schema_edit,
+//! Eighteen tools — seven queries, validate, drift, six write ops, schema_edit,
 //! vaults — plus the skill's compact distillation as initialize `instructions`.
 //! The vault is reloaded per call: a full rebuild is milliseconds, and always
 //! correct beats cleverly cached.
@@ -100,6 +100,8 @@ fn resolve_vault_dir(mode: &McpMode, args: &Value) -> Result<PathBuf> {
 }
 
 pub fn serve(mode: McpMode) -> Result<()> {
+    // Views started this session: vault dir -> bound port. They die with us.
+    let mut views: std::collections::HashMap<PathBuf, u16> = std::collections::HashMap::new();
     let stdin = std::io::stdin();
     let mut stdout = std::io::stdout().lock();
     for line in stdin.lock().lines() {
@@ -137,7 +139,7 @@ pub fn serve(mode: McpMode) -> Result<()> {
             "tools/call" => {
                 let name = msg["params"]["name"].as_str().unwrap_or("");
                 let args = msg["params"]["arguments"].clone();
-                match call(&mode, name, args) {
+                match call(&mode, name, args, &mut views) {
                     Ok(v) => json!({
                         "content": [{ "type": "text", "text": serde_json::to_string_pretty(&v)? }],
                         "isError": false,
@@ -167,7 +169,29 @@ fn respond(out: &mut impl Write, v: Value) -> Result<()> {
     Ok(())
 }
 
-fn call(mode: &McpMode, name: &str, args: Value) -> Result<Value> {
+fn call(
+    mode: &McpMode,
+    name: &str,
+    args: Value,
+    views: &mut std::collections::HashMap<PathBuf, u16>,
+) -> Result<Value> {
+    if name == "laplace_serve" {
+        let vault_dir = resolve_vault_dir(mode, &args)?;
+        if let Some(port) = views.get(&vault_dir) {
+            return Ok(json!({
+                "url": format!("http://127.0.0.1:{port}/"),
+                "already_running": true,
+                "note": "the view lives as long as this session",
+            }));
+        }
+        let port = crate::serve::spawn(vault_dir.clone(), 6174)?;
+        views.insert(vault_dir, port);
+        return Ok(json!({
+            "url": format!("http://127.0.0.1:{port}/"),
+            "already_running": false,
+            "note": "read-only view; it lives as long as this session — hand the URL to the human",
+        }));
+    }
     if name == "laplace_vaults" {
         let root = match mode {
             McpMode::Single(dir) => dir.clone(),
@@ -440,6 +464,9 @@ fn tool_defs() -> Vec<Value> {
                 "path": sp("(kinds|relations).<name>.<field> (set op)"), "value": sp("new value (set op)"),
                 "old": sp("old name (rename ops)"), "new": sp("new name (rename ops)")
             }), &["op"]) }),
+        json!({ "name": "laplace_serve",
+            "description": "Start (or reuse) the read-only HTML view for a vault and return its URL — hand it to the human; the view lives as long as this session.",
+            "inputSchema": obj(json!({}), &[]) }),
         json!({ "name": "laplace_vaults",
             "description": "List the vaults this server can see (name, path, entity count, validity) — the map of maps.",
             "inputSchema": { "type": "object", "properties": {}, "required": [] } }),

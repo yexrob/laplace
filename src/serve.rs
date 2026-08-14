@@ -67,6 +67,33 @@ fn api_graph(vault_dir: &Path) -> Reply {
     }
 }
 
+/// Start the view server on a background thread: preferred port first, an
+/// ephemeral one if taken. Returns the port actually bound. The thread lives
+/// until the process exits — for the MCP server that means "as long as the
+/// session", which is exactly the right lifetime for a session's view.
+pub fn spawn(vault_dir: PathBuf, preferred: u16) -> Result<u16> {
+    let server = tiny_http::Server::http(("127.0.0.1", preferred))
+        .or_else(|_| tiny_http::Server::http(("127.0.0.1", 0)))
+        .map_err(|e| anyhow::anyhow!("cannot bind a view port: {e}"))?;
+    let port = match server.server_addr() {
+        tiny_http::ListenAddr::IP(a) => a.port(),
+        _ => preferred,
+    };
+    std::thread::spawn(move || {
+        for request in server.incoming_requests() {
+            let reply = respond(&vault_dir, request.url());
+            let response = tiny_http::Response::from_string(reply.body)
+                .with_status_code(reply.status)
+                .with_header(
+                    tiny_http::Header::from_bytes("Content-Type", reply.content_type)
+                        .expect("static header"),
+                );
+            let _ = request.respond(response);
+        }
+    });
+    Ok(port)
+}
+
 pub fn serve(vault_dir: PathBuf, port: u16) -> Result<()> {
     let server = tiny_http::Server::http(("127.0.0.1", port))
         .map_err(|e| anyhow::anyhow!("cannot bind 127.0.0.1:{port}: {e}"))?;

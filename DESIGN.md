@@ -72,7 +72,7 @@ Three perception paths, one background channel, one accepted limitation:
 | `laplace export` | CLI | full graph JSON to stdout — the jq/pipeline escape hatch |
 | `laplace summary` | CLI | entity index + relation digest + recent changes, **token-capped** (tiered truncation: counts → kind index → per-entity lines); designed to be injected into an agent's system context by the harness (Claude Code: CLAUDE.md snippet or SessionStart hook) |
 | `laplace serve` | CLI | read-only HTML view (tiny_http, GET-only) |
-| `laplace mcp [--scan DIR]` | MCP server (stdio) | 17 tools: 7 queries + validate + drift + 6 write ops + schema ops + vaults; --scan serves every vault under DIR with a per-call `vault` selector |
+| `laplace mcp [--scan DIR]` | MCP server (stdio) | 18 tools: 7 queries + validate + drift + 6 write ops + schema ops + vaults + serve (session-scoped view); --scan serves every vault under DIR with a per-call `vault` selector |
 | skill | `skill/entity-map/` | the maintenance discipline as an installable agent skill: when to generate/refresh, "update the truth whenever a change touches entities", "the summary is not enough — query, don't guess" |
 
 ## HTML view

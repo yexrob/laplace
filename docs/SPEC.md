@@ -198,7 +198,7 @@ Seven tools; one semantics shared by CLI (`laplace query <tool>`, human text def
 | `architecture` | — | kind-level condensation: `{kind, count}` nodes, `{from_kind, type, to_kind, count}` edges — the whole-map overview that is safe to render, and the usage precedent for vocabulary choices |
 | `schema` | — | the constitution: charter, kinds, relation types with descriptions and propagation — the agent's first stop before writing |
 
-MCP tool descriptions are contract: each carries a one-line when-to-use (e.g. `laplace_search`: "resolve names to refs — search before adding or guessing"). MCP exposes the seven queries, `laplace_validate`, `laplace_drift`, the six write operations, `laplace_schema_edit` (§2), and `laplace_vaults` — seventeen tools. There is no raw-file write tool; writes are semantic operations only.
+MCP tool descriptions are contract: each carries a one-line when-to-use (e.g. `laplace_search`: "resolve names to refs — search before adding or guessing"). MCP exposes the seven queries, `laplace_validate`, `laplace_drift`, the six write operations, `laplace_schema_edit` (§2), `laplace_vaults`, and `laplace_serve` (start or reuse the session-scoped view thread for a vault and return its URL — it dies with the session, no orphan processes) — eighteen tools. There is no raw-file write tool; writes are semantic operations only.
 
 **Multi-vault scan mode**: `laplace mcp --scan DIR` discovers every vault under DIR (every directory holding a schema.yaml, gitignore-aware) and serves them all from one process. Every tool takes an optional `vault` selector (schema name or path suffix) — required only while several loadable vaults exist; `laplace_vaults` lists what was found with entity counts and validity, so unloadable vaults are disclosed, never silently skipped.
 
@@ -264,7 +264,7 @@ laplace summary [--budget N]         §7; default budget 1200 tokens (CJK-aware 
 laplace skill show|install [--to DIR]  §8
 laplace export                       full graph JSON to stdout (same payload as /api/graph)
 laplace serve [--port 6174]          read-only HTML view; see §9a
-laplace mcp [--scan DIR]             MCP server on stdio (17 tools); --scan serves every vault under DIR
+laplace mcp [--scan DIR]             MCP server on stdio (18 tools); --scan serves every vault under DIR
 ```
 
 Global: `--vault DIR`. Deliberate non-tools: no `fmt` (nothing to format — writes are already canonical, bodies are prose), no `watch` (lazy rebuild), no `stats` (`architecture` is it), no raw-file write (semantic operations only).

@@ -75,7 +75,7 @@ impl Drop for Server {
 }
 
 #[test]
-fn mcp_lists_17_tools_queries_and_writes() {
+fn mcp_lists_18_tools_queries_and_writes() {
     let src = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/xiyouji");
     let tmp = tempfile::tempdir().unwrap();
     copy_dir(&src, tmp.path());
@@ -97,7 +97,7 @@ fn mcp_lists_17_tools_queries_and_writes() {
 
     let tools = s.request("tools/list", json!({}));
     let list = tools["result"]["tools"].as_array().unwrap();
-    assert_eq!(list.len(), 17, "seventeen tools, SPEC §5");
+    assert_eq!(list.len(), 18, "eighteen tools, SPEC §5");
     assert!(
         list.iter()
             .all(|t| t["description"].as_str().is_some_and(|d| !d.is_empty()))
@@ -138,6 +138,20 @@ fn mcp_lists_17_tools_queries_and_writes() {
     );
     assert!(err, "must be an error: {text}");
     assert!(text.contains("no such entity"), "{text}");
+
+    // The session view: started on demand, idempotent, actually serving.
+    let (err, text) = s.call_tool("laplace_serve", json!({}));
+    assert!(!err, "{text}");
+    let v: Value = serde_json::from_str(&text).unwrap();
+    let url = v["url"].as_str().unwrap().to_string();
+    assert_eq!(v["already_running"], false);
+    let (err, text) = s.call_tool("laplace_serve", json!({}));
+    assert!(!err, "{text}");
+    let v: Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(v["already_running"], true);
+    assert_eq!(v["url"].as_str().unwrap(), url);
+    let body = ureq_get(&format!("{url}api/graph"));
+    assert!(body.contains("\"ok\":true"), "view thread actually serves");
 
     // validate still clean after the round trip.
     let (err, text) = s.call_tool("laplace_validate", json!({}));
@@ -203,4 +217,21 @@ fn mcp_scan_mode_serves_every_vault_with_a_selector() {
     );
     assert!(!err, "{text}");
     assert!(text.contains("bingo"), "{text}");
+}
+
+fn ureq_get(url: &str) -> String {
+    use std::io::{Read, Write};
+    let hostpath = url.strip_prefix("http://").unwrap();
+    let (host, path) = hostpath.split_once('/').unwrap();
+    let mut conn = std::net::TcpStream::connect(host).unwrap();
+    write!(
+        conn,
+        "GET /{path} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n"
+    )
+    .unwrap();
+    // Chunked framing can split multi-byte CJK codepoints across chunks, so
+    // the raw stream is not valid UTF-8 as a whole — read bytes, decode lossy.
+    let mut buf = Vec::new();
+    conn.read_to_end(&mut buf).unwrap();
+    String::from_utf8_lossy(&buf).into_owned()
 }
