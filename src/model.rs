@@ -86,7 +86,7 @@ impl Propagation {
     }
 }
 
-#[derive(Deserialize, Default, Debug)]
+#[derive(Deserialize, Default, Debug, Clone)]
 pub struct KindDecl {
     #[serde(default)]
     pub description: Option<String>,
@@ -99,7 +99,7 @@ impl KindDecl {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct RelationDecl {
     /// Required; must state the reading direction. Checked in validate for a
     /// better diagnostic than a serde error.
@@ -122,7 +122,7 @@ fn default_root() -> String {
 }
 
 /// `schema.yaml` — the constitution (SPEC §1.5).
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Schema {
     #[serde(rename = "apiVersion")]
     pub api_version: String,
@@ -145,7 +145,7 @@ pub struct Schema {
 }
 
 /// One relation entry: a bare ref or an object with free edge attributes.
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum RelEntry {
     Bare(String),
@@ -154,6 +154,23 @@ pub enum RelEntry {
         #[serde(flatten)]
         attrs: BTreeMap<String, serde_norway::Value>,
     },
+}
+
+impl serde::Serialize for RelEntry {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        match self {
+            RelEntry::Bare(r) => s.serialize_str(r),
+            RelEntry::Object { r#ref, attrs } => {
+                use serde::ser::SerializeMap;
+                let mut m = s.serialize_map(Some(1 + attrs.len()))?;
+                m.serialize_entry("ref", r#ref)?;
+                for (k, v) in attrs {
+                    m.serialize_entry(k, v)?;
+                }
+                m.end()
+            }
+        }
+    }
 }
 
 impl RelEntry {
@@ -174,7 +191,7 @@ impl RelEntry {
 
 /// Entity frontmatter — flat, machine-owned (SPEC §1.2). `kind`/`name` are
 /// captured only to reject them: path is identity.
-#[derive(Deserialize, Default, Debug)]
+#[derive(Deserialize, Default, Debug, Clone)]
 pub struct FrontMatter {
     #[serde(default)]
     pub title: Option<String>,
@@ -194,7 +211,7 @@ pub struct FrontMatter {
     pub extra: BTreeMap<String, serde_norway::Value>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Entity {
     pub eref: EntityRef,
     /// Vault-relative path.

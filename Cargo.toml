@@ -15,3 +15,6 @@ serde_json = "1"
 # serde_yaml is archived; serde_norway is its maintained continuation with the same API.
 serde_norway = "0.9"
 unicode-normalization = "0.1"
+
+[dev-dependencies]
+tempfile = "3.27.0"

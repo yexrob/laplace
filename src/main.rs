@@ -3,7 +3,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use laplace::graph::Graph;
-use laplace::{query, validate, vault};
+use laplace::{drift, mcp, ops, query, schema_ops, validate, vault};
 use serde_json::Value;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -27,11 +27,132 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Cmd {
+    /// Scaffold ./laplace/schema.yaml — only if absent.
+    Init {
+        /// Project name (default: the current directory's name).
+        #[arg(long)]
+        name: Option<String>,
+    },
     /// Validate the vault: structure, declarations, references, anchors.
     Validate,
     /// Query the graph.
     #[command(subcommand)]
     Query(QueryCmd),
+    /// Create an entity — validated before anything touches disk.
+    Add {
+        kind: Option<String>,
+        name: Option<String>,
+        #[arg(long)]
+        ns: Option<String>,
+        #[arg(long)]
+        title: Option<String>,
+        #[arg(long = "tag")]
+        tags: Vec<String>,
+        #[arg(long)]
+        lifecycle: Option<String>,
+        /// The prose description — what this is, why it exists.
+        #[arg(long)]
+        body: Option<String>,
+        /// Repeatable: "type=target", e.g. --rel "持有=artifact:如意金箍棒".
+        #[arg(long = "rel")]
+        rels: Vec<String>,
+        /// Repeatable: root-relative glob anchoring this entity.
+        #[arg(long = "source")]
+        sources: Vec<String>,
+        /// Read a full AddSpec as JSON from stdin instead of flags.
+        #[arg(long)]
+        stdin: bool,
+    },
+    /// Set/unset fields of an entity; body only when explicitly given.
+    Update {
+        r#ref: String,
+        #[arg(long)]
+        title: Option<String>,
+        #[arg(long)]
+        clear_title: bool,
+        #[arg(long)]
+        lifecycle: Option<String>,
+        #[arg(long)]
+        clear_lifecycle: bool,
+        #[arg(long = "tag")]
+        add_tags: Vec<String>,
+        #[arg(long = "untag")]
+        remove_tags: Vec<String>,
+        /// Repeatable free-form key: --set k=v.
+        #[arg(long = "set")]
+        set: Vec<String>,
+        #[arg(long = "unset")]
+        unset: Vec<String>,
+        #[arg(long)]
+        body: Option<String>,
+    },
+    /// Add one relation edge; echoes the full edge list of that type.
+    Link {
+        from: String,
+        rel: String,
+        to: String,
+        #[arg(long)]
+        note: Option<String>,
+    },
+    /// Remove one relation edge.
+    Unlink {
+        from: String,
+        rel: String,
+        to: String,
+    },
+    /// Delete an entity — refuses while inbound refs exist.
+    Remove { r#ref: String },
+    /// Rename/move an entity, rewriting all inbound refs atomically.
+    Rename {
+        r#ref: String,
+        new_name: String,
+        #[arg(long)]
+        ns: Option<String>,
+    },
+    /// Constitutional operations on schema.yaml.
+    #[command(subcommand)]
+    Schema(SchemaCmd),
+    /// Session-start freshness audit against git history.
+    Drift {
+        #[arg(long)]
+        since: Option<String>,
+    },
+    /// Full graph JSON to stdout — the jq/pipeline escape hatch.
+    Export,
+    /// MCP server on stdio (16 tools).
+    Mcp,
+}
+
+#[derive(Subcommand)]
+enum SchemaCmd {
+    /// Declare a kind.
+    AddKind {
+        name: String,
+        #[arg(long)]
+        description: Option<String>,
+    },
+    /// Declare a relation type — the description must state the reading direction.
+    AddRelation {
+        name: String,
+        #[arg(long)]
+        description: String,
+        #[arg(long)]
+        propagation: Option<String>,
+        #[arg(long)]
+        symmetric: bool,
+        #[arg(long)]
+        acyclic: bool,
+        #[arg(long, value_delimiter = ',')]
+        from: Option<Vec<String>>,
+        #[arg(long, value_delimiter = ',')]
+        to: Option<Vec<String>>,
+    },
+    /// Set one declaration field: (kinds|relations).<name>.<field> <value>.
+    Set { path: String, value: String },
+    /// Rename a kind: moves the directory and rewrites every ref vault-wide.
+    RenameKind { old: String, new: String },
+    /// Rename a relation type: rewrites every usage vault-wide.
+    RenameRelation { old: String, new: String },
 }
 
 #[derive(Subcommand)]
@@ -94,11 +215,166 @@ fn main() -> ExitCode {
 
 fn run(cli: Cli) -> Result<ExitCode> {
     let cwd = std::env::current_dir()?;
+    if let Cmd::Init { name } = &cli.cmd {
+        return init(&cwd, name.as_deref());
+    }
     let dir = vault::discover(&cwd, cli.vault.as_deref())?;
+    if matches!(cli.cmd, Cmd::Mcp) {
+        mcp::serve(dir)?;
+        return Ok(ExitCode::SUCCESS);
+    }
     let vault = vault::load(&dir)?;
+
+    // The write operations and drift/export.
+    let op_result: Option<Result<ops::Outcome>> = match &cli.cmd {
+        Cmd::Add {
+            kind,
+            name,
+            ns,
+            title,
+            tags,
+            lifecycle,
+            body,
+            rels,
+            sources,
+            stdin,
+        } => Some(
+            build_add_spec(
+                kind, name, ns, title, tags, lifecycle, body, rels, sources, *stdin,
+            )
+            .and_then(|spec| ops::add(&vault, spec)),
+        ),
+        Cmd::Update {
+            r#ref,
+            title,
+            clear_title,
+            lifecycle,
+            clear_lifecycle,
+            add_tags,
+            remove_tags,
+            set,
+            unset,
+            body,
+        } => {
+            let parsed_set: Result<Vec<(String, String)>> = set
+                .iter()
+                .map(|kv| {
+                    kv.split_once('=')
+                        .map(|(k, v)| (k.to_string(), v.to_string()))
+                        .ok_or_else(|| anyhow::anyhow!("--set takes k=v, got `{kv}`"))
+                })
+                .collect();
+            Some(parsed_set.and_then(|set| {
+                ops::update(
+                    &vault,
+                    r#ref,
+                    ops::UpdateSpec {
+                        title: title.clone(),
+                        clear_title: *clear_title,
+                        lifecycle: lifecycle.clone(),
+                        clear_lifecycle: *clear_lifecycle,
+                        add_tags: add_tags.clone(),
+                        remove_tags: remove_tags.clone(),
+                        set,
+                        unset: unset.clone(),
+                        body: body.clone(),
+                    },
+                )
+            }))
+        }
+        Cmd::Link {
+            from,
+            rel,
+            to,
+            note,
+        } => Some(ops::link(&vault, from, rel, to, note.clone())),
+        Cmd::Unlink { from, rel, to } => Some(ops::unlink(&vault, from, rel, to)),
+        Cmd::Remove { r#ref } => Some(ops::remove(&vault, r#ref)),
+        Cmd::Rename {
+            r#ref,
+            new_name,
+            ns,
+        } => Some(ops::rename(&vault, r#ref, new_name, ns.as_deref())),
+        Cmd::Schema(sc) => Some(match sc {
+            SchemaCmd::AddKind { name, description } => {
+                schema_ops::add_kind(&vault, name, description.clone())
+            }
+            SchemaCmd::AddRelation {
+                name,
+                description,
+                propagation,
+                symmetric,
+                acyclic,
+                from,
+                to,
+            } => {
+                let prop = propagation
+                    .as_deref()
+                    .map(serde_norway::from_str)
+                    .transpose()
+                    .map_err(|_| anyhow::anyhow!("propagation is to-source|to-target|both|none"));
+                prop.and_then(|propagation| {
+                    schema_ops::add_relation(
+                        &vault,
+                        name,
+                        schema_ops::RelationSpec {
+                            description: description.clone(),
+                            propagation,
+                            symmetric: *symmetric,
+                            acyclic: *acyclic,
+                            from: from.clone(),
+                            to: to.clone(),
+                        },
+                    )
+                })
+            }
+            SchemaCmd::Set { path, value } => schema_ops::set(&vault, path, value),
+            SchemaCmd::RenameKind { old, new } => schema_ops::rename_kind(&vault, old, new),
+            SchemaCmd::RenameRelation { old, new } => schema_ops::rename_relation(&vault, old, new),
+        }),
+        _ => None,
+    };
+    if let Some(result) = op_result {
+        return Ok(match result {
+            Ok(outcome) => {
+                if cli.json {
+                    println!("{}", serde_json::to_string_pretty(&outcome.json)?);
+                } else {
+                    println!("{}", outcome.message);
+                }
+                ExitCode::SUCCESS
+            }
+            Err(e) => {
+                eprintln!("laplace: {e:#}");
+                ExitCode::from(1)
+            }
+        });
+    }
+    if let Cmd::Drift { since } = &cli.cmd {
+        let v = drift::run(&vault, since.as_deref())?;
+        if cli.json {
+            println!("{}", serde_json::to_string_pretty(&v)?);
+        } else {
+            print!("{}", drift::render_text(&v));
+        }
+        return Ok(ExitCode::SUCCESS);
+    }
+
     let report = validate::run(&vault);
 
     match cli.cmd {
+        Cmd::Export => {
+            if report.errors() > 0 {
+                eprintln!(
+                    "refusing to export an invalid vault ({} errors)",
+                    report.errors()
+                );
+                return Ok(ExitCode::from(1));
+            }
+            let g = Graph::build(&vault);
+            println!("{}", serde_json::to_string_pretty(&query::export(&g))?);
+            Ok(ExitCode::SUCCESS)
+        }
         Cmd::Validate => {
             if cli.json {
                 println!("{}", serde_json::to_string_pretty(&report.diags)?);
@@ -182,7 +458,102 @@ fn run(cli: Cli) -> Result<ExitCode> {
             }
             Ok(ExitCode::SUCCESS)
         }
+        _ => unreachable!("handled above"),
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn build_add_spec(
+    kind: &Option<String>,
+    name: &Option<String>,
+    ns: &Option<String>,
+    title: &Option<String>,
+    tags: &[String],
+    lifecycle: &Option<String>,
+    body: &Option<String>,
+    rels: &[String],
+    sources: &[String],
+    stdin: bool,
+) -> Result<ops::AddSpec> {
+    if stdin {
+        let mut buf = String::new();
+        std::io::Read::read_to_string(&mut std::io::stdin(), &mut buf)?;
+        return Ok(serde_json::from_str(&buf)?);
+    }
+    let (Some(kind), Some(name)) = (kind, name) else {
+        anyhow::bail!("laplace add <kind> <name> … (or --stdin with a JSON spec)");
+    };
+    let mut relations: std::collections::BTreeMap<String, Vec<laplace::model::RelEntry>> =
+        Default::default();
+    for r in rels {
+        let (t, target) = r
+            .split_once('=')
+            .ok_or_else(|| anyhow::anyhow!("--rel takes type=target, got `{r}`"))?;
+        relations
+            .entry(t.to_string())
+            .or_default()
+            .push(laplace::model::RelEntry::Bare(target.to_string()));
+    }
+    Ok(ops::AddSpec {
+        kind: kind.clone(),
+        name: name.clone(),
+        namespace: ns.clone(),
+        title: title.clone(),
+        tags: tags.to_vec(),
+        lifecycle: lifecycle.clone(),
+        body: body.clone().unwrap_or_default(),
+        relations,
+        source: sources.to_vec(),
+    })
+}
+
+fn init(cwd: &std::path::Path, name: Option<&str>) -> Result<ExitCode> {
+    let dir = cwd.join("laplace");
+    let schema = dir.join("schema.yaml");
+    if schema.exists() {
+        anyhow::bail!("{} already exists — nothing scaffolded", schema.display());
+    }
+    let project = name
+        .map(str::to_string)
+        .or_else(|| cwd.file_name().map(|n| n.to_string_lossy().into_owned()))
+        .unwrap_or_else(|| "project".into());
+    std::fs::create_dir_all(&dir)?;
+    std::fs::write(
+        &schema,
+        format!(
+            r#"apiVersion: laplace/v1
+name: {project}
+# root: ..            # what source/ignore globs resolve against (default: the directory containing this vault)
+
+# The charter: the questions this map exists to answer. Derive the vocabulary
+# below from these questions — not from ontological completeness.
+charter:
+  - 改动 X，哪些东西必须跟着重看？
+
+# ignore: []          # declared non-territory: paths no entity will ever claim
+# exclusions: []      # concept-shaped non-goals, with reasons
+
+# Kinds: the nouns. A description's first sentence is its label; the rest is
+# the authoring guide surfaced at `laplace add` time.
+kinds:
+  thing: {{ description: 一类东西。描述应写清它为什么存在、负责什么。 }}
+
+# Relations: the verbs. Every relation MUST state its reading direction.
+# propagation — the two-question test for `A rel B`:
+#   B changed, must A be revisited?  yes → to-source
+#   A changed, must B be revisited?  yes → to-target   (both/none accordingly)
+relations:
+  depends-on:
+    description: A depends-on B —— A 是消费方，B 是被依赖方。改 B 要回头看 A。
+    propagation: to-source
+"#
+        ),
+    )?;
+    println!(
+        "scaffolded {} — edit the constitution, then `laplace add` your first entity",
+        schema.display()
+    );
+    Ok(ExitCode::SUCCESS)
 }
 
 fn render_text(cmd: &QueryCmd, v: &Value) {

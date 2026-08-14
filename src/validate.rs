@@ -377,20 +377,7 @@ fn anchor_checks(vault: &Vault, diags: &mut Vec<Diagnostic>) {
     if anchored.is_empty() {
         return;
     }
-    let mut files: Vec<String> = Vec::new();
-    if vault.project_root.is_dir() {
-        for entry in ignore::WalkBuilder::new(&vault.project_root)
-            .hidden(true)
-            .build()
-            .flatten()
-        {
-            if entry.file_type().is_some_and(|t| t.is_file())
-                && let Ok(rel) = entry.path().strip_prefix(&vault.project_root)
-            {
-                files.push(rel.to_string_lossy().replace('\\', "/"));
-            }
-        }
-    }
+    let files = walk_project_files(&vault.project_root);
     for (e, glob) in anchored {
         let Ok(g) = Glob::new(glob) else {
             diags.push(Diagnostic {
@@ -426,6 +413,26 @@ fn anchor_checks(vault: &Vault, diags: &mut Vec<Diagnostic>) {
     }
 }
 
+/// Walk the project root once, honoring .gitignore and skipping hidden files,
+/// returning root-relative slash-separated paths. Shared by anchor checks and drift.
+pub fn walk_project_files(root: &std::path::Path) -> Vec<String> {
+    let mut files: Vec<String> = Vec::new();
+    if root.is_dir() {
+        for entry in ignore::WalkBuilder::new(root)
+            .hidden(true)
+            .build()
+            .flatten()
+        {
+            if entry.file_type().is_some_and(|t| t.is_file())
+                && let Ok(rel) = entry.path().strip_prefix(root)
+            {
+                files.push(rel.to_string_lossy().replace('\\', "/"));
+            }
+        }
+    }
+    files
+}
+
 fn bad_endpoint(e: &crate::model::Entity, rel: &str, msg: &str) -> Diagnostic {
     Diagnostic {
         severity: Severity::Error,
@@ -441,7 +448,7 @@ fn bad_endpoint(e: &crate::model::Entity, rel: &str, msg: &str) -> Diagnostic {
 
 /// did-you-mean (SPEC §3): same kind at distance ≤ 2 first, then the same name
 /// under another kind/namespace, then cross-kind distance ≤ 2.
-fn did_you_mean(target: &EntityRef, refs: &BTreeSet<EntityRef>) -> Option<String> {
+pub fn did_you_mean(target: &EntityRef, refs: &BTreeSet<EntityRef>) -> Option<String> {
     let mut best: Option<(usize, &EntityRef)> = None;
     for r in refs {
         if r.kind == target.kind {

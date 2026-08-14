@@ -66,27 +66,6 @@ pub fn load(dir: &Path) -> Result<Vault> {
 
     for file in files {
         let rel = file.strip_prefix(dir).unwrap().to_path_buf();
-        let comps: Vec<String> = rel
-            .iter()
-            .map(|c| c.to_string_lossy().into_owned())
-            .collect();
-        let (kind, ns, stem) = match comps.len() {
-            2 => (comps[0].clone(), "default".to_string(), stem(&comps[1])),
-            3 => (comps[0].clone(), comps[1].clone(), stem(&comps[2])),
-            _ => {
-                diags.push(Diagnostic::err(
-                    "bad-layout",
-                    Some(rel.clone()),
-                    format!(
-                        "entity files live at <kind>/<name>.md or <kind>/<namespace>/<name>.md, not {} levels deep",
-                        comps.len()
-                    ),
-                ));
-                continue;
-            }
-        };
-        let eref = EntityRef::new(&kind, &ns, &stem);
-
         let raw = match std::fs::read_to_string(&file) {
             Ok(t) => t,
             Err(e) => {
@@ -98,69 +77,17 @@ pub fn load(dir: &Path) -> Result<Vault> {
                 continue;
             }
         };
-        let (fm, body) = match split_frontmatter(&raw) {
-            Ok((fm_text, body)) => {
-                let fm: FrontMatter = if fm_text.trim().is_empty() {
-                    FrontMatter::default()
-                } else {
-                    match serde_norway::from_str(fm_text) {
-                        Ok(fm) => fm,
-                        Err(e) => {
-                            let line = e.location().map(|l| l.line() + 1);
-                            diags.push(Diagnostic {
-                                severity: Severity::Error,
-                                code: "bad-frontmatter",
-                                file: Some(rel.clone()),
-                                line,
-                                entity: Some(eref.to_string()),
-                                path: None,
-                                message: format!("frontmatter does not parse: {e}"),
-                                suggestion: None,
-                            });
-                            continue;
-                        }
-                    }
-                };
-                (fm, body.to_string())
-            }
-            Err(msg) => {
-                diags.push(Diagnostic::err("bad-frontmatter", Some(rel.clone()), msg));
-                continue;
-            }
-        };
-
-        if fm.kind.is_some() || fm.name.is_some() {
-            diags.push(Diagnostic {
-                severity: Severity::Error,
-                code: "identity-in-frontmatter",
-                file: Some(rel.clone()),
-                line: None,
-                entity: Some(eref.to_string()),
-                path: None,
-                message: "path is identity: kind and name derive from the file path and must not appear in frontmatter".into(),
-                suggestion: Some("delete the kind:/name: keys".into()),
-            });
-        }
-        if body.trim().is_empty() {
-            diags.push(Diagnostic {
-                severity: Severity::Warning,
-                code: "empty-body",
-                file: Some(rel.clone()),
-                line: None,
-                entity: Some(eref.to_string()),
-                path: None,
-                message: "no description: the body is the entity's prose".into(),
-                suggestion: None,
-            });
-        }
-        if let Some(prev) = by_ref.get(&eref) {
+        let (entity, entity_diags) = parse_entity(rel.clone(), raw);
+        diags.extend(entity_diags);
+        let Some(entity) = entity else { continue };
+        if let Some(prev) = by_ref.get(&entity.eref) {
             // Only reachable via NFC collision: two byte-distinct paths, one identity.
             diags.push(Diagnostic {
                 severity: Severity::Error,
                 code: "duplicate-entity",
-                file: Some(rel.clone()),
+                file: Some(rel),
                 line: None,
-                entity: Some(eref.to_string()),
+                entity: Some(entity.eref.to_string()),
                 path: None,
                 message: format!(
                     "normalizes to the same identity as {} (Unicode NFC)",
@@ -170,14 +97,8 @@ pub fn load(dir: &Path) -> Result<Vault> {
             });
             continue;
         }
-        by_ref.insert(eref.clone(), rel.clone());
-        entities.push(Entity {
-            eref,
-            file: rel,
-            fm,
-            body,
-            raw,
-        });
+        by_ref.insert(entity.eref.clone(), entity.file.clone());
+        entities.push(entity);
     }
 
     if entities.is_empty() {
@@ -219,6 +140,100 @@ impl Vault {
             )
         }
     }
+}
+
+/// Parse one entity file from its vault-relative path and raw text. Total:
+/// problems come back as diagnostics; `None` means the file yields no entity.
+/// Shared by `load` and by the write operations' pre-commit simulation.
+pub fn parse_entity(rel: PathBuf, raw: String) -> (Option<Entity>, Vec<Diagnostic>) {
+    let mut diags = Vec::new();
+    let comps: Vec<String> = rel
+        .iter()
+        .map(|c| c.to_string_lossy().into_owned())
+        .collect();
+    let (kind, ns, stem_) = match comps.len() {
+        2 => (comps[0].clone(), "default".to_string(), stem(&comps[1])),
+        3 => (comps[0].clone(), comps[1].clone(), stem(&comps[2])),
+        n => {
+            diags.push(Diagnostic::err(
+                "bad-layout",
+                Some(rel),
+                format!(
+                    "entity files live at <kind>/<name>.md or <kind>/<namespace>/<name>.md, not {n} levels deep"
+                ),
+            ));
+            return (None, diags);
+        }
+    };
+    let eref = EntityRef::new(&kind, &ns, &stem_);
+
+    let (fm, body) = match split_frontmatter(&raw) {
+        Ok((fm_text, body)) => {
+            let fm: FrontMatter = if fm_text.trim().is_empty() {
+                FrontMatter::default()
+            } else {
+                match serde_norway::from_str(fm_text) {
+                    Ok(fm) => fm,
+                    Err(e) => {
+                        let line = e.location().map(|l| l.line() + 1);
+                        diags.push(Diagnostic {
+                            severity: Severity::Error,
+                            code: "bad-frontmatter",
+                            file: Some(rel),
+                            line,
+                            entity: Some(eref.to_string()),
+                            path: None,
+                            message: format!("frontmatter does not parse: {e}"),
+                            suggestion: None,
+                        });
+                        return (None, diags);
+                    }
+                }
+            };
+            (fm, body.to_string())
+        }
+        Err(msg) => {
+            diags.push(Diagnostic::err("bad-frontmatter", Some(rel), msg));
+            return (None, diags);
+        }
+    };
+
+    if fm.kind.is_some() || fm.name.is_some() {
+        diags.push(Diagnostic {
+            severity: Severity::Error,
+            code: "identity-in-frontmatter",
+            file: Some(rel.clone()),
+            line: None,
+            entity: Some(eref.to_string()),
+            path: None,
+            message:
+                "path is identity: kind and name derive from the file path and must not appear in frontmatter"
+                    .into(),
+            suggestion: Some("delete the kind:/name: keys".into()),
+        });
+    }
+    if body.trim().is_empty() {
+        diags.push(Diagnostic {
+            severity: Severity::Warning,
+            code: "empty-body",
+            file: Some(rel.clone()),
+            line: None,
+            entity: Some(eref.to_string()),
+            path: None,
+            message: "no description: the body is the entity's prose".into(),
+            suggestion: None,
+        });
+    }
+    (
+        Some(Entity {
+            eref,
+            file: rel,
+            fm,
+            body,
+            raw,
+        }),
+        diags,
+    )
 }
 
 fn collect_md(root: &Path, dir: &Path, out: &mut Vec<PathBuf>, diags: &mut Vec<Diagnostic>) {

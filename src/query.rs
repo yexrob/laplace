@@ -368,3 +368,32 @@ pub fn schema(g: &Graph) -> Value {
         }).collect::<Vec<_>>(),
     })
 }
+
+/// export: the full graph JSON — the same payload serve's /api/graph returns.
+pub fn export(g: &Graph) -> Value {
+    json!({
+        "schema": schema(g),
+        "counts": { "entities": g.vault.entities.len(), "edges": g.edges.len() },
+        "nodes": g.vault.entities.iter().map(|e| json!({
+            "ref": e.eref.to_string(),
+            "kind": e.eref.kind,
+            "namespace": e.eref.ns,
+            "name": e.eref.name,
+            "title": e.title(),
+            "tags": e.fm.tags,
+            "lifecycle": e.fm.lifecycle,
+            "summary": e.first_sentence(),
+            "file": e.file,
+        })).collect::<Vec<_>>(),
+        "edges": g.edges.iter().map(|e| {
+            let mut v = json!({
+                "from": g.entity(e.source).eref.to_string(),
+                "rel": e.rel,
+                "to": g.entity(e.target).eref.to_string(),
+            });
+            if g.is_symmetric(&e.rel) { v["symmetric"] = json!(true); }
+            if let Some(n) = &e.note { v["note"] = json!(n); }
+            v
+        }).collect::<Vec<_>>(),
+    })
+}

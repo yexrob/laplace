@@ -151,9 +151,9 @@ The agent's creation path. Six operations, identical semantics over CLI and MCP;
 | `remove` | delete an entity | **refuses if inbound refs exist**, listing them (unlink first) — danglings are impossible by construction |
 | `rename` | rename/move an entity (name and/or namespace), atomically rewriting **all inbound refs** across the vault | target path free; reports the count of prose *mentions* of the old name in bodies (bodies are never rewritten — prose is human domain; the agent reviews those by hand) |
 
-**Schema operations** — constitutional changes are vault-wide transactions and get the same mediation: `laplace schema add-kind|add-relation|set|rename-kind|rename-relation`. `add-relation` enforces the reading-direction description at creation time; `set` re-checks propagation/symmetric legality; the renames atomically rewrite every usage across entity frontmatters (`rename-kind` also moves the kind directory). Direct schema edits remain legal; `validate` reconciles.
+**Schema operations** — constitutional changes are vault-wide transactions and get the same mediation: `laplace schema add-kind|add-relation|set|rename-kind|rename-relation`. `add-relation` enforces the reading-direction description at creation time; `set` re-checks propagation/symmetric legality; the renames atomically rewrite every usage across entity frontmatters (`rename-kind` also moves the kind directory). `schema.yaml` is machine-owned like frontmatter: ops re-serialize it canonically (comments and scalar styles are not preserved — constitutional prose lives in `description`/`charter`/`exclusions` fields, which survive). Direct schema edits remain legal; `validate` reconciles.
 
-Input forms: CLI flags for the simple cases, `--json` on stdin for full payloads; MCP tools take structured params (the schema family is one MCP tool, `laplace_schema`, with an `op` discriminator). Multi-file transactions (renames) write all temp files first, then rename all; git is the rollback of last resort.
+Input forms: CLI flags for the simple cases, `--stdin` JSON for full payloads; MCP tools take structured params (the schema family is one MCP tool, `laplace_schema_edit`, with an `op` discriminator — `laplace_schema` is the read-side constitution query). Multi-file transactions (renames) write all temp files first, then rename all; git is the rollback of last resort.
 
 **Addressability**: refs are paths (`character:孙悟空` ⇔ `laplace/character/孙悟空.md` — locating an entity is a pure function, never a search); `get` returns the entity's vault path; the constitution stays small by vocabulary budget, so YAML key paths (`relations.师从.propagation`) address it; diagnostics carry `file:line`.
 
@@ -198,7 +198,7 @@ Seven tools; one semantics shared by CLI (`laplace query <tool>`, human text def
 | `architecture` | — | kind-level condensation: `{kind, count}` nodes, `{from_kind, type, to_kind, count}` edges — the whole-map overview that is safe to render, and the usage precedent for vocabulary choices |
 | `schema` | — | the constitution: charter, kinds, relation types with descriptions and propagation — the agent's first stop before writing |
 
-MCP tool descriptions are contract: each carries a one-line when-to-use (e.g. `laplace_search`: "resolve names to refs — search before adding or guessing"). MCP exposes the seven queries, `laplace_validate`, `laplace_drift`, the six write operations, and `laplace_schema` (§2) — sixteen tools. There is no raw-file write tool; writes are semantic operations only.
+MCP tool descriptions are contract: each carries a one-line when-to-use (e.g. `laplace_search`: "resolve names to refs — search before adding or guessing"). MCP exposes the seven queries, `laplace_validate`, `laplace_drift`, the six write operations, and `laplace_schema_edit` (§2) — sixteen tools. There is no raw-file write tool; writes are semantic operations only.
 
 ## 6. Drift (cross-session calibration as a tool)
 
