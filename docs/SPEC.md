@@ -79,20 +79,26 @@ title: 西游记·前七回
 charter:                              # the questions this map exists to answer
   - 杀掉或改写一个角色，哪些章回和伏笔要重看？
   - 一件法宝的设定变了，波及哪些人物与事件？
+ignore: ["notes/**", "**/*.lock"]     # declared non-territory: no entity will ever claim these paths
 kinds:
-  character: { description: 人物 }
+  character: { description: 人物。描述应涵盖出身、能力、动机与主要羁绊。 }
   artifact:  { description: 法宝与兵器 }
   chapter:   { description: 回目 }
 relations:
   师从:
     description: A 师从 B —— A 是徒弟，B 是师父。改写师父的道法，徒弟必须重看。
     propagation: to-source
+    from: [character]
+    to: [character]
   持有:
     description: A 持有 B —— A 是持有者，B 是器物。
     propagation: to-source
+    from: [character]
+    to: [artifact]
   出现于:
     description: A 出现于 B —— A 是人物或器物，B 是章回。
     propagation: to-target
+    to: [chapter]
   宿敌:
     description: A 与 B 互为宿敌。对称，不传播。
     symmetric: true
@@ -100,8 +106,9 @@ relations:
 ```
 
 - `charter`: the map's reason for existing, as questions. Vocabulary changes must cite a charter question (or add one); `query schema` returns it so every future agent sees why the map is shaped as it is.
-- `kinds`: kind → `{description?}`. An entity directory not declared here → `unknown-kind`.
-- `relations`: type → declaration. **`description` is required** and must state the reading direction ("A rel B means…") — direction confusion corrupts silently and even the designer gets it wrong unaided; `propagation` defaults to `to-source`; `symmetric: true` requires propagation `both` or `none` (else `bad-propagation`). A relation used but not declared → `undeclared-relation`.
+- `ignore`: declared non-territory — project-relative globs no entity will ever claim; `drift` excludes them from its uncovered report. What the map deliberately does not cover is constitutional knowledge too.
+- `kinds`: kind → `{description?}`. An entity directory not declared here → `unknown-kind`. Convention: a kind's description doubles as its authoring guide (what a good description of this kind covers); the skill surfaces it at `add` time.
+- `relations`: type → declaration. **`description` is required** and must state the reading direction ("A rel B means…") — direction confusion corrupts silently and even the designer gets it wrong unaided; `propagation` defaults to `to-source`; `symmetric: true` requires propagation `both` or `none` (else `bad-propagation`); optional `from:` / `to:` (kind lists) constrain endpoints — an edge violating them is `bad-endpoint`, absent means unconstrained. A relation used but not declared → `undeclared-relation`.
 
 ### 1.6 Propagation (the impact semantics contract)
 
@@ -122,9 +129,9 @@ The agent's creation path. Six operations, identical semantics over CLI and MCP;
 
 | op | does | validation before write |
 |---|---|---|
-| `add` | create an entity: kind, name, namespace?, title?, tags?, body (description), relations?, source? | kind declared; ref grammar; no existing entity at that path; every relation type declared; every target ref resolves (dangling → reject + did-you-mean) |
+| `add` | create an entity: kind, name, namespace?, title?, tags?, body (description), relations?, source? | kind declared; ref grammar; no existing entity at that path; every relation type declared; every target resolves (dangling → reject + did-you-mean) and satisfies endpoint constraints |
 | `update` | set/unset fields of an existing entity (title, tags, lifecycle, free keys; `--body` replaces the description explicitly) | field-level; body untouched unless explicitly given |
-| `link` | add one relation entry `from rel to [--note]` | type declared; both ends resolve; duplicate edge → no-op warning |
+| `link` | add one relation entry `from rel to [--note]` | type declared; both ends resolve; endpoints legal; duplicate edge → no-op warning |
 | `unlink` | remove one relation entry | edge exists |
 | `remove` | delete an entity | **refuses if inbound refs exist**, listing them (unlink first) — danglings are impossible by construction |
 | `rename` | rename/move an entity (name and/or namespace), atomically rewriting **all inbound refs** across the vault | target path free; reports the count of prose *mentions* of the old name in bodies (bodies are never rewritten — prose is human domain; the agent reviews those by hand) |
@@ -142,7 +149,7 @@ What this buys: the model does judgment (what to name, what to connect, why), th
 `laplace validate` is the reconciler for whatever bypassed the write path (direct edits, merges) and the CI gate. Three layers, hard errors unless noted:
 
 1. **Structure**: frontmatter parses; known layout (`kind/[ns/]name.md`); ref grammar.
-2. **Declaration**: entity's kind directory ∈ `schema.kinds`; every relation type ∈ `schema.relations`; propagation values legal; relation declarations carry descriptions.
+2. **Declaration**: entity's kind directory ∈ `schema.kinds`; every relation type ∈ `schema.relations`; propagation values legal; relation declarations carry descriptions; edges satisfy endpoint constraints (`bad-endpoint`).
 3. **Reference**: every target resolves; danglings get did-you-mean (same name under another kind/namespace, or edit distance ≤ 2).
 
 Errors are file-and-line-addressed: `{severity, code, file, line?, path?, message, suggestion?}` — e.g.
@@ -181,7 +188,7 @@ MCP tool descriptions are contract: each carries a one-line when-to-use (e.g. `l
 `laplace drift [--since REV] [--json]` — the session-start freshness audit in one call. Requires git.
 
 - **Base**: last commit touching the vault (`--since` overrides).
-- **Changed set**: paths changed since base, plus dirty working-tree paths.
+- **Changed set**: paths changed since base, plus dirty working-tree paths, minus the schema's `ignore` globs (declared non-territory).
 - **Report**: `stale` — entities whose `source` globs match changed paths (`{ref, paths, commits}`); `uncovered` — changed paths matching no entity's globs (unmapped territory); `unanchored` — count and ratio of entities with no `source` (disclosed blindness, so silence is never mistaken for cleanliness).
 - Per-entity file history additionally gives each entity its own last-touched timestamp for free.
 - Exit 0 always (informational). No git or zero anchors → explicit notice, never a silent pass.
@@ -230,7 +237,7 @@ Global: `--vault DIR`. Deliberate non-tools: no `fmt` (nothing to format — wri
 
 ## 9. Versioning & compatibility
 
-`apiVersion: laplace/v1` in `schema.yaml` only. Additive evolution within v1; breaking changes bump the major and readers refuse unknown majors with a clear message. Reserved for later definition: per-kind attribute schemas (`kinds.<k>.attributes`), body wikilink parsing as implicit "mentions" edges, lifecycle vocabularies.
+`apiVersion: laplace/v1` in `schema.yaml` only. Additive evolution within v1; breaking changes bump the major and readers refuse unknown majors with a clear message. Reserved for later definition: per-kind attribute schemas (`kinds.<k>.attributes`), body wikilink parsing as implicit "mentions" edges, lifecycle vocabularies, relation inverse display names. Deliberately rejected (recorded so they stay rejected): cardinality constraints (a map is not a database), kind hierarchies (tags cover classification; two mechanisms would fight), inference rules (the engine stays dumb — reasoning is the model's job), tag vocabularies (freedom is the feature).
 
 ## 10. Implementation notes (non-normative)
 
