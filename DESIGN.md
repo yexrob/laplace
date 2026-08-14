@@ -9,46 +9,44 @@ As a project grows past a complexity threshold, an AI agent's picture of it drif
 ## Principles
 
 1. **Fully domain-general — no domain is special-cased.** The schema ships no built-in kinds. Every project defines its own kinds. Nothing in the format, graph engine, view, or summary hardcodes any domain concept. Generality is proven by modeling *different* projects (fixtures in ≥2 domains), not by special-casing a category.
-2. **Single source of truth.** `laplace.yaml` is the only writable artifact. The graph is a derived cache; the summary and the HTML view are projections. Nothing else is ever authoritative.
+2. **Single source of truth.** The vault (one markdown file per entity + `schema.yaml`) is the only authoritative artifact. The graph is a derived cache; the summary and the HTML view are projections. Nothing else is ever authoritative.
 3. **The AI maintains, the human views.** The AI is the writer of the truth — in-session edits under the skill discipline, or a background agent. The human consumes projections (HTML view, injected summary) and hands entity references back. This division is what makes the map affordable to keep fresh.
 4. **Harness-agnostic by contract.** Laplace ships interfaces (CLI, MCP, summary text), not harness patches. Any agent harness integrates through the same contracts.
-5. **Laplace never writes the truth file** (`init` scaffolding excepted). Every command is read-only over `laplace.yaml`; the agent's editor is the sole writer. This is what keeps YAML comments and formatting alive — nothing ever round-trips through a serializer — and it keeps the tool honest: a projector, not a co-author.
+5. **Laplace mediates writes; it does not own them.** The agent creates and links entities *through* Laplace's transactional operations (validate-before-write: format errors are impossible by construction, dangling refs are rejected synchronously with did-you-mean), so the vault never goes invalid through the write path. Ownership is split: frontmatter is machine-owned, the markdown body is prose and never touched implicitly. Direct file edits stay legal — `validate` reconciles them. (The Obsidian shape, agent-first: vault of plain files as truth, the app as the operation mediator, links/backlinks/graph computed.)
 
 Normative format, validation, and query semantics: [docs/SPEC.md](docs/SPEC.md).
 
 ## Architecture
 
 ```
-domain    schema: user-defined kinds / relations / attrs   sole entry point for domain knowledge
-truth     laplace.yaml  ★ the only writable file ★         everything below is a deterministic projection
+domain    schema.yaml: kinds / relations / charter         the constitution; sole entry point for domain knowledge
+truth     vault: one .md per entity  ★ single truth ★      path is identity; frontmatter structured, body prose
+ops       add/update/link/unlink/remove/rename             transactional: validate against live graph, then write
 draft     structure walk → model synthesis → review        the draft machine replaces hand-authoring
-index     in-memory property graph                         derived cache, lazily rebuilt (hash check)
-query     search / trace / impact / architecture           via CLI and MCP; summary + on-demand ≫ full YAML
+index     in-memory property graph                         derived cache, lazily rebuilt (content-hash check)
+query     search/get/neighbors/trace/impact/arch/schema    via CLI and MCP; summary + on-demand ≫ full vault
 consume   summary injection + HTML view                    one truth, two audiences (model / human)
 handoff   copy entity string-ref in view → paste to agent  zero write path in the view
 ```
 
 ## The truth file
 
-`laplace.yaml`, at the project root. Multi-document YAML, one entity per document, Backstage-style envelope:
+A **vault** directory (default `laplace/`): `schema.yaml` as the constitution (kinds, relation types with reading-direction descriptions and propagation, and the **charter** — the questions the map exists to answer), plus one markdown file per entity at `<kind>/[<namespace>/]<name>.md` — flat frontmatter for structured fields (title, tags, lifecycle, relations, source anchors), markdown body as the prose description.
 
-```yaml
-apiVersion: laplace/v1
-kind: character            # user-defined; declared in the schema preamble
-metadata:
-  name: qing-luan
-  tags: [protagonist]
-spec:
-  description: ...
-  relations:
-    appears-in: [chapter:default/ch-03]
-    rival-of: [character:default/shen-yu]
-  lifecycle: active
+```markdown
+---
+tags: [主角]
+relations:
+  师从: [character:菩提祖师]
+  持有: [artifact:如意金箍棒]
+source: [chapters/ch0[1-7].md]
+---
+灵明石猴，拜菩提祖师学得地煞七十二变……
 ```
 
-- **Kinds and relation types are declared per project** in a schema preamble (first document), then validated: unknown kinds, dangling string-refs, malformed envelopes are rejected with actionable messages.
-- **String-refs** (`kind:namespace/name`) are the universal join key — used in relations, in the HTML view's copy button, and in human↔agent handoff.
-- Versioned, diffable, commentable. The file's own git history (when available) sources the "recent changes" digest.
+- **Path is identity**: kind/namespace/name derive from the file path; duplicates are impossible by construction.
+- **String-refs** (`kind:namespace/name`, Unicode-native) are the universal join key — in relations, the view's copy button, and human↔agent handoff.
+- Versioned, diffable; per-entity git history feeds the "recent changes" digest and per-entity freshness for free.
 
 ## Freshness model
 
@@ -67,12 +65,13 @@ Three perception paths, one background channel, one accepted limitation:
 |---|---|---|
 | `laplace init` | CLI | scaffold `laplace.yaml` + schema preamble interactively or from a template |
 | `laplace validate` | CLI | schema + ref integrity; CI-friendly exit codes |
-| `laplace query <tool>` | CLI | `search`, `get`, `neighbors`, `trace`, `impact`, `architecture`, `schema`; JSON or text output (SPEC §4) |
+| `laplace add/update/link/unlink/remove/rename` | CLI + MCP | the write operations: transactional, validate-before-write, atomic; `rename` rewrites all inbound refs (SPEC §2) |
+| `laplace query <tool>` | CLI | `search`, `get`, `neighbors`, `trace`, `impact`, `architecture`, `schema`; JSON or text output (SPEC §5) |
 | `laplace drift` | CLI | session-start freshness audit: stale entities (via `spec.source` anchors) + uncovered changed paths + unanchored ratio (SPEC §5) |
 | `laplace export` | CLI | full graph JSON to stdout — the jq/pipeline escape hatch |
 | `laplace summary` | CLI | entity index + relation digest + recent changes, **token-capped** (tiered truncation: counts → kind index → per-entity lines); designed to be injected into an agent's system context by the harness (Claude Code: CLAUDE.md snippet or SessionStart hook) |
 | `laplace serve` | CLI | read-only HTML view (tiny_http, GET-only) |
-| `laplace mcp` | MCP server (stdio) | the query tools for any MCP client; no write tools in v1 |
+| `laplace mcp` | MCP server (stdio) | 15 tools: 7 queries + validate + drift + 6 write operations; no raw-file writes — semantic operations only |
 | skill | `skill/entity-map/` | the maintenance discipline as an installable agent skill: when to generate/refresh, "update the truth whenever a change touches entities", "the summary is not enough — query, don't guess" |
 
 ## HTML view
@@ -104,8 +103,8 @@ Three perception paths, one background channel, one accepted limitation:
 
 ## Milestones
 
-- **M1 — core**: format model, schema preamble + validation, in-memory graph engine, `laplace validate` + `laplace query` (7 tools, CLI); two fixture projects in different domains — bingo (codebase) and 西游记·前七回 (narrative, Unicode-native refs)
-- **M2 — channels**: `laplace mcp` server (queries + validate + drift), `laplace drift`, `laplace export`; correct results on both fixtures
+- **M1 — core**: vault model (path-is-identity, frontmatter), schema constitution + validation, in-memory graph engine, `laplace validate` + `laplace query` (7 tools, CLI); two fixture vaults hand-authored in different domains — bingo (codebase) and 西游记·前七回 (narrative, Unicode-native refs)
+- **M2 — operations & channels**: the six write operations (CLI + MCP), `laplace mcp` (15 tools), `laplace drift`, `laplace export`; fixture edits exercised through the ops path
 - **M3 — inject**: `laplace summary` with token cap + the `entity-map` skill (drift-aware session-start discipline); end-to-end: agent maintains the map on a fixture, summary + on-demand query replaces full-YAML reading
 - **M4 — view**: `laplace serve`; browse/search/filter/multi-select/copy-ref on both fixtures
 - **M5 — skeleton** (phase 2): tree-sitter symbol extraction for parseable projects — the objective drift evidence beyond file-level anchors
