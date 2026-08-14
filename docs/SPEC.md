@@ -131,7 +131,7 @@ The agent's creation path. Six operations, identical semantics over CLI and MCP;
 |---|---|---|
 | `add` | create an entity: kind, name, namespace?, title?, tags?, body (description), relations?, source? | kind declared; ref grammar; no existing entity at that path; every relation type declared; every target resolves (dangling → reject + did-you-mean) and satisfies endpoint constraints |
 | `update` | set/unset fields of an existing entity (title, tags, lifecycle, free keys; `--body` replaces the description explicitly) | field-level; body untouched unless explicitly given |
-| `link` | add one relation entry `from rel to [--note]` | type declared; both ends resolve; endpoints legal; duplicate edge → no-op warning |
+| `link` | add one relation entry `from rel to [--note]` | type declared; both ends resolve; endpoints legal; duplicate edge → no-op warning. Success output echoes the source's full edge list of that type (`now 师从: [菩提祖师, 唐僧]`) — plausibility judgment stays with the model, but the facts it needs are pushed in front of it at the moment of action. Cardinality is deliberately not declared or enforced: category errors (endpoints) get hard rejection, plausibility deviations are often reality itself (孙悟空 has two masters) — the map records what is |
 | `unlink` | remove one relation entry | edge exists |
 | `remove` | delete an entity | **refuses if inbound refs exist**, listing them (unlink first) — danglings are impossible by construction |
 | `rename` | rename/move an entity (name and/or namespace), atomically rewriting **all inbound refs** across the vault | target path free; reports the count of prose *mentions* of the old name in bodies (bodies are never rewritten — prose is human domain; the agent reviews those by hand) |
