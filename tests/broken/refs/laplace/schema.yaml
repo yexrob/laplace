@@ -1,0 +1,6 @@
+apiVersion: laplace/v1
+name: refs
+kinds:
+  a: { description: things }
+relations:
+  uses: { description: "A uses B — A is the consumer.", propagation: to-source }

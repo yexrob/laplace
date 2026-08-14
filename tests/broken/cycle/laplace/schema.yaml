@@ -1,0 +1,6 @@
+apiVersion: laplace/v1
+name: cycle
+kinds:
+  e: { description: events }
+relations:
+  follows: { description: "A follows B — B is the cause.", propagation: to-source, acyclic: true }

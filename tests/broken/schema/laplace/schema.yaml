@@ -1,0 +1,7 @@
+apiVersion: laplace/v1
+name: badschema
+kinds:
+  k: { description: ks }
+relations:
+  nodesc: { propagation: to-source }
+  sym: { description: "A and B.", symmetric: true, propagation: to-source }

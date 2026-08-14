@@ -1,0 +1,8 @@
+apiVersion: laplace/v1
+name: endpoints
+kinds:
+  a: { description: as }
+  b: { description: bs }
+relations:
+  owns: { description: "A owns B.", propagation: to-source, from: [a], to: [a] }
+  pals: { description: "A and B are pals.", symmetric: true, propagation: none }

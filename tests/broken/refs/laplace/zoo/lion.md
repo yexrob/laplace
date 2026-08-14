@@ -1,0 +1,1 @@
+Zoo animal, kind undeclared.
