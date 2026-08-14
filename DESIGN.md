@@ -66,7 +66,9 @@ Three perception paths, one background channel, one accepted limitation:
 |---|---|---|
 | `laplace init` | CLI | scaffold `laplace.yaml` + schema preamble interactively or from a template |
 | `laplace validate` | CLI | schema + ref integrity; CI-friendly exit codes |
-| `laplace query <tool>` | CLI | `search`, `get`, `neighbors`, `trace`, `impact`, `architecture`; JSON or text output (SPEC §4) |
+| `laplace query <tool>` | CLI | `search`, `get`, `neighbors`, `trace`, `impact`, `architecture`, `schema`; JSON or text output (SPEC §4) |
+| `laplace drift` | CLI | session-start freshness audit: stale entities (via `spec.source` anchors) + uncovered changed paths + unanchored ratio (SPEC §5) |
+| `laplace export` | CLI | full graph JSON to stdout — the jq/pipeline escape hatch |
 | `laplace summary` | CLI | entity index + relation digest + recent changes, **token-capped** (tiered truncation: counts → kind index → per-entity lines); designed to be injected into an agent's system context by the harness (Claude Code: CLAUDE.md snippet or SessionStart hook) |
 | `laplace serve` | CLI | read-only HTML view (tiny_http, GET-only) |
 | `laplace mcp` | MCP server (stdio) | the query tools for any MCP client; no write tools in v1 |
@@ -101,11 +103,11 @@ Three perception paths, one background channel, one accepted limitation:
 
 ## Milestones
 
-- **M1 — core**: format model, schema preamble + validation, in-memory graph engine, `laplace validate`; two fixture projects in different domains — bingo (codebase) and 西游记·前七回 (narrative, Unicode-native refs)
-- **M2 — query**: `laplace query` CLI + `laplace mcp` server; correct results on both fixtures
-- **M3 — inject**: `laplace summary` with token cap + the `entity-map` skill; end-to-end: agent maintains the map on a fixture, summary + on-demand query replaces full-YAML reading
+- **M1 — core**: format model, schema preamble + validation, in-memory graph engine, `laplace validate` + `laplace query` (7 tools, CLI); two fixture projects in different domains — bingo (codebase) and 西游记·前七回 (narrative, Unicode-native refs)
+- **M2 — channels**: `laplace mcp` server (queries + validate + drift), `laplace drift`, `laplace export`; correct results on both fixtures
+- **M3 — inject**: `laplace summary` with token cap + the `entity-map` skill (drift-aware session-start discipline); end-to-end: agent maintains the map on a fixture, summary + on-demand query replaces full-YAML reading
 - **M4 — view**: `laplace serve`; browse/search/filter/multi-select/copy-ref on both fixtures
-- **M5 — drift** (phase 2): tree-sitter symbol skeleton + drift diff for parseable projects
+- **M5 — skeleton** (phase 2): tree-sitter symbol extraction for parseable projects — the objective drift evidence beyond file-level anchors
 
 ## Naming
 

@@ -31,6 +31,7 @@ spec:
   description: <string>  # optional but the skill demands it
   lifecycle: <string>    # optional free string; skill recommends a small per-project vocabulary
   relations: {...}       # optional; see 1.4
+  source: [<glob>...]    # optional: project-relative globs anchoring this entity to files (feeds drift, §5)
   <anything else>: ...   # free-form, preserved, displayed; not validated in v1
 ```
 
@@ -123,7 +124,7 @@ Warnings: `duplicate-edge` (deduped), `empty-map`. Exit codes: 0 clean (warnings
 
 ## 4. Query tools
 
-Six tools; one semantics shared by CLI (`laplace query <tool>`, human text default, `--json` for machines) and MCP (`laplace_<tool>`, always JSON).
+Seven tools; one semantics shared by CLI (`laplace query <tool>`, human text default, `--json` for machines) and MCP (`laplace_<tool>`, always JSON).
 
 | tool | signature | returns |
 |---|---|---|
@@ -133,8 +134,25 @@ Six tools; one semantics shared by CLI (`laplace query <tool>`, human text defau
 | `trace` | `from, to, limit=5, max_len=6` | shortest simple paths in the undirected view, each hop annotated `(relation, direction)` — answers "how are these two connected?" |
 | `impact` | `ref, depth=10, via?` | BFS closure over the propagation digraph: `{ref, distance, path}` per affected entity, one shortest witness path each, sorted by distance — answers "what does changing this touch?" `via` restricts relation types. |
 | `architecture` | — | kind-level condensation: `{kind, count}` nodes, `{from_kind, type, to_kind, count}` aggregated edges — the whole-map overview that IS safe to render |
+| `schema` | — | the parsed Schema preamble: declared kinds and relation types with propagation/symmetric — the maintainer's cheat sheet before writing new entries |
 
-## 5. Summary projection
+MCP tool descriptions are part of the contract: each teaches its when-to-use in one line (e.g. `laplace_search`: "resolve names to refs — search before adding an entity or guessing a ref"). The MCP server also exposes `laplace_validate` and `laplace_drift` (below) so an agent can close its maintenance loop without shell access. All MCP tools are read-only — the write invariant (§0.2) has no MCP exception.
+
+## 5. Drift (cross-session calibration as a tool)
+
+`laplace drift [--since REV] [--json]` — turns the session-start freshness audit into one call. Requires a git repository; entities participate by declaring `spec.source` globs.
+
+- **Base**: the last commit touching `laplace.yaml` (`--since` overrides).
+- **Changed set**: paths changed in commits after base, plus dirty working-tree paths (`git status --porcelain`).
+- **Report**:
+  - `stale` — entities whose `source` globs match changed paths: `{ref, paths, commits}` (the map may misdescribe these);
+  - `uncovered` — changed paths matching no entity's globs (candidate new/unmapped territory);
+  - `unanchored` — count and ratio of entities with no `source` at all (coverage disclosure, so silence is never mistaken for cleanliness).
+- Exit 0 always (informational). No git or zero anchors → an explicit notice, never a silent pass.
+
+Domain note: anchoring is capability-bound, not domain-bound — a novel anchors `character:孙悟空` to `chapters/ch0[1-7].md` exactly as a codebase anchors `module:core/term` to `src/term/**`. Projects with no file-shaped source simply stay on discipline + review.
+
+## 6. Summary projection
 
 `laplace summary [--budget N]` (default budget 1200 tokens) emits the block a harness injects into agent context:
 
@@ -156,25 +174,29 @@ If your edits touch an entity (add/rename/remove/re-relate), update laplace.yaml
 - **Token estimation** is CJK-aware: `ceil(ascii/4) + cjk + ceil(other/2)` — CJK counts ~1 token per char; ASCII-calibrated ÷4 heuristics undercount it badly (learned the hard way in bingo#40).
 - The two discipline lines are part of the format contract — harnesses and the skill rely on their exact presence.
 
-## 6. CLI surface
+## 7. CLI surface
 
 ```
 laplace init                 scaffold laplace.yaml (only if absent) with a commented Schema template
 laplace validate [--json]
 laplace query <tool> …       see §4
+laplace drift [--since REV]  see §5
 laplace summary [--budget N]
+laplace export               full graph JSON to stdout (same payload as /api/graph) — the jq/pipeline escape hatch
 laplace serve [--port 6174]
 laplace mcp                  MCP server on stdio
 ```
 
+Deliberate non-tools: no write/`fmt`/`mv` commands (write invariant §0.2 — renames are agent edits, `validate`'s did-you-mean is the net); no `watch` (lazy rebuild makes it pointless); no standalone `stats` (`architecture` is it).
+
 Global: `--file PATH`. `serve` v1: GET-only (tiny_http); routes `/` (embedded single-page shell) and `/api/graph` (full graph JSON; client renders list/detail/filters, Mermaid draws `neighbors` of the selection only). Default port 6174 — the Kaprekar constant: every start converges to the same fixed point, like the map.
 
-## 7. Versioning & compatibility
+## 8. Versioning & compatibility
 
 - `apiVersion: laplace/v1`. Additive evolution within v1 (new optional envelope fields, new declaration fields). Breaking format changes bump to v2; readers refuse unknown majors with a clear message.
 - Reserved now, undefined until needed: kind `Schema` (only), `metadata.annotations`, per-kind attribute schemas (`spec.kinds.<k>.attributes`), directory-of-files loading (the format is already document-level; only discovery changes).
 
-## 8. Implementation notes (non-normative)
+## 9. Implementation notes (non-normative)
 
 - YAML: `serde_yaml` is archived — evaluate the active successors (`saphyr`-based serde bridges, `serde_norway`, `serde_yml`) at implementation time; requirement: multi-doc streams + serde derive + decent error positions.
 - MCP: hand-rolled stdio JSON-RPC (~small) vs the official `rmcp` SDK — decide at M2; the tool surface (§4) is fixed either way.
