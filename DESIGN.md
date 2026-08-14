@@ -39,7 +39,7 @@ tags: [主角]
 relations:
   师从: [character:菩提祖师]
   持有: [artifact:如意金箍棒]
-source: [chapters/ch0[1-7].md]
+source: ["chapters/ch0[1-7].md"]
 ---
 灵明石猴，拜菩提祖师学得地煞七十二变……
 ```

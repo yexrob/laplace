@@ -46,16 +46,16 @@ relations:
     - ref: artifact:如意金箍棒
     - ref: artifact:凤翅紫金冠
       note: 龙宫索得，非战斗所用
-source: [chapters/ch0[1-7].md]   # optional drift anchors (project-relative globs)
+source: ["chapters/ch0[1-7].md"]   # optional drift anchors: globs MUST be quoted (brackets are YAML flow syntax)
 ---
-灵明石猴，东胜神洲花果山出身。拜菩提祖师学得地煞七十二变与筋斗云，
-后大闹天宫，自号齐天大圣。
+灵明石猴，东胜神洲花果山出身。拜菩提祖师学得地煞七十二变与筋斗云，后大闹天宫，自号齐天大圣。
 
 正文即描述：自由散文，属于人可珍视的层，工具的字段级操作永不触碰。
 ```
 
-- The body is the description. The first non-empty line serves as the one-line summary in query results and views.
+- The body is the description. Its **first sentence** (up to the first sentence terminator, capped at 120 display cells) is the one-line summary in query results and views — "first line" does not survive CJK prose, which is naturally unwrapped; author the first sentence to be summary-worthy.
 - Unknown frontmatter keys are free-form, preserved, and displayed — the format is open at the attribute level.
+- **The map asserts the present.** 敖广曾持有金箍棒 is prose (or an edge `note`), not a present-tense `持有` edge; the past lives in the body and in the vault's own git history — that history *is* the time axis, so there is no temporal edge model (§9).
 
 ### 1.3 Refs
 
@@ -64,11 +64,15 @@ ref  = kind ":" [ namespace "/" ] name
 word = 1+ of { Unicode letters, Unicode digits, "-", "_", "." }
 ```
 
-`kind`, `namespace`, `name` are words; forbidden characters: whitespace, `:` `/` `,` `[` `]`, quotes (names are also filesystem-constrained by construction). Namespace elision: `character:孙悟空` ≡ `character:default/孙悟空`. Tools emit the canonical namespaced form. Matching is exact — search is where fuzziness lives.
+`kind`, `namespace`, `name` are words; forbidden characters: whitespace, `:` `/` `,` `[` `]`, quotes (names are also filesystem-constrained by construction). Namespace elision: `character:孙悟空` ≡ `character:default/孙悟空`. Tools emit the canonical namespaced form. Matching is exact — search is where fuzziness lives — and ref↔path matching is **NFC-normalized** (macOS filesystems may hand back decomposed forms). The storage suffix is always exactly one appended `.md`: a name may contain dots (`v1.2` → `v1.2.md`).
+
+A namespace is a **one-level organizational disambiguator with project-defined meaning** (a faction, a source directory, a team) — it is not a path mirror; deeper trees flatten into the name.
 
 ### 1.4 Relations
 
 `relations:` maps a declared relation type to a list of targets; each entry is a bare ref or an object (`ref` required; `note` and other keys are free edge attributes). Duplicate edges (same source, type, target) are deduplicated with a warning. Relations live only on the source entity's frontmatter; backlinks are computed, never stored.
+
+**Symmetric relations are declared once, on either side.** `A 结义 B` on A's file and `B 结义 A` on B's file are the same edge stated twice — materialized once, flagged `symmetric-declared-twice` (the duplicate-edge rule alone would miss it, since the sources differ).
 
 ### 1.5 schema.yaml (the constitution)
 
@@ -76,10 +80,13 @@ word = 1+ of { Unicode letters, Unicode digits, "-", "_", "." }
 apiVersion: laplace/v1
 name: xiyouji
 title: 西游记·前七回
+root: ..                              # what source/ignore globs are relative to (default ..: the directory containing the vault)
 charter:                              # the questions this map exists to answer
   - 杀掉或改写一个角色，哪些章回和伏笔要重看？
   - 一件法宝的设定变了，波及哪些人物与事件？
 ignore: ["notes/**", "**/*.lock"]     # declared non-territory: no entity will ever claim these paths
+exclusions:                           # concept-shaped non-goals (ignore is path-shaped; this is its conceptual counterpart)
+  - 逐场打斗不入图——事件粒度到主线节点为止
 kinds:
   character: { description: 人物。描述应涵盖出身、能力、动机与主要羁绊。 }
   artifact:  { description: 法宝与兵器 }
@@ -105,10 +112,12 @@ relations:
     propagation: none
 ```
 
-- `charter`: the map's reason for existing, as questions. Vocabulary changes must cite a charter question (or add one); `query schema` returns it so every future agent sees why the map is shaped as it is.
-- `ignore`: declared non-territory — project-relative globs no entity will ever claim; `drift` excludes them from its uncovered report. What the map deliberately does not cover is constitutional knowledge too.
-- `kinds`: kind → `{description?}`. An entity directory not declared here → `unknown-kind`. Convention: a kind's description doubles as its authoring guide (what a good description of this kind covers); the skill surfaces it at `add` time.
-- `relations`: type → declaration. **`description` is required** and must state the reading direction ("A rel B means…") — direction confusion corrupts silently and even the designer gets it wrong unaided; `propagation` defaults to `to-source`; `symmetric: true` requires propagation `both` or `none` (else `bad-propagation`); optional `from:` / `to:` (kind lists) constrain endpoints — an edge violating them is `bad-endpoint`, absent means unconstrained. A relation used but not declared → `undeclared-relation`.
+- `root`: the base every `source` and `ignore` glob resolves against, stated relative to the vault directory. Default `..` (the directory containing the vault); a vault that *is* the project root declares `root: .`. One glob string, one meaning — discovery mode never changes it.
+- `charter`: the map's reason for existing, as questions. Vocabulary changes must cite a charter question (or add one); `query schema` returns it so every future agent sees why the map is shaped as it is. Charter questions may be impact-shaped ("动它波及什么") *or* connection-shaped ("这俩怎么连的") — the latter are served by `trace`/`neighbors`, and justify `propagation: none` relations.
+- `ignore`: declared non-territory — root-relative globs no entity will ever claim; `drift` excludes them from its uncovered report. What the map deliberately does not cover is constitutional knowledge too.
+- `exclusions`: concept-shaped non-goals with their reasons — the conceptual counterpart of path-shaped `ignore` ("decision records stay in notes/research.md, they would dominate the graph"). Returned by `query schema`, so deliberate absences stop living only in session transcripts.
+- `kinds`: kind → `{description?}`. An entity directory not declared here → `unknown-kind`. Convention: the description's **first sentence** is the display label; the rest is the authoring guide (what a good description of this kind covers), surfaced by the skill at `add` time.
+- `relations`: type → declaration. **`description` is required** and must state the reading direction ("A rel B means…") — direction confusion corrupts silently and even the designer gets it wrong unaided; `propagation` defaults to `to-source`; `symmetric: true` requires propagation `both` or `none` (else `bad-propagation`); optional `from:` / `to:` (kind lists) constrain endpoints — an edge violating them is `bad-endpoint`, absent means unconstrained; optional `acyclic: true` declares that the relation may not form cycles (承接-style succession) — a cycle is then an error. A relation used but not declared → `undeclared-relation`.
 
 ### 1.6 Propagation (the impact semantics contract)
 
@@ -122,6 +131,12 @@ For an edge `A --rel--> B`, `propagation` states where a change propagates:
 | `none` | no propagation | pure annotation (宿敌) |
 
 **The two-question test** (normative guidance for declaring): for `A rel B`, ask "B changed — must A be revisited?" (yes → includes `to-source`) and "A changed — must B be revisited?" (yes → includes `to-target`). Both yes → `both`; both no → `none`.
+
+Three consequences worth knowing before they surprise you:
+
+- **The test is per type, and that is deliberate.** If a type's edges honestly split on the test (五行山↔五行山镇压 is `both`; 花果山↔石猴出世 is `to-source`), that heterogeneity *is* the evidence that one name is wearing two verbs — split the type. Per-edge propagation overrides are rejected (§9): they would dissolve the economy of concentrating semantic judgment at the type level.
+- **Pure-sink kinds are normal, not broken.** A container kind reached only by `to-target` edges (chapters) has an empty `impact` closure — "改写第三回，什么要重看" is a *connection-shaped* question answered by `neighbors 第三回`, not `impact`. The skill teaches which tool fits which question shape.
+- **`both` is expensive and honest.** In a densely-`both` vocabulary the closure reaches most of the map within 2–3 hops (measured on both fixture domains); that is the true answer, and it is only usable because distance is reported. Do not downgrade an honest `both` to make queries prettier — sacrifice was never the deal; rely on depth and distance instead.
 
 ## 2. Write operations
 
@@ -159,7 +174,9 @@ laplace/character/沈雨.md:6: relations.宿敌 → character:沈玉
   dangling-ref: no such entity. Did you mean character:沈雨?
 ```
 
-Warnings: `duplicate-edge` (deduped), `empty-vault`. Exit codes: 0 clean, 1 errors, 2 usage/IO.
+Two checks added by fixture experience: **`dead-anchor`** — a `source` glob that matches nothing (a renamed file otherwise degrades silently to "never stale", i.e. permanently clean); and **cycle detection** on relations declared `acyclic: true`.
+
+Warnings: `duplicate-edge` (deduped), `symmetric-declared-twice` (deduped), `orphan` (an entity with no edges in either direction), `empty-vault`. Exit codes: 0 clean, 1 errors, 2 usage/IO.
 
 ## 4. Graph model
 
@@ -177,7 +194,7 @@ Seven tools; one semantics shared by CLI (`laplace query <tool>`, human text def
 | `get` | `ref` | frontmatter + full body + computed edges both directions with attrs + the entity's vault path |
 | `neighbors` | `ref, depth=1 (max 2), kinds?, relations?` | induced subgraph around ref — the serve view's data source |
 | `trace` | `from, to, limit=5, max_len=6` | shortest simple paths, undirected view, hops annotated `(type, direction)` — "how are these two connected?" |
-| `impact` | `ref, depth=10, via?` | BFS closure over the propagation digraph: `{ref, distance, path}` with one shortest witness path each, distance-sorted — "what does changing this touch?" Output is a **candidate set, not an oracle**: sound w.r.t. the declared map, complete never; distance is the confidence gradient |
+| `impact` | `ref, depth=2, via?` | BFS closure over the propagation digraph, **distance-bucketed** (`distance 1: …` / `distance 2: …`) with one shortest witness path each — "what does changing this touch?" Output is a **candidate set, not an oracle**: sound w.r.t. the declared map, complete never. Default depth 2 because measured closures reach most of a real map by depth 3–4 — **distance is the whole signal**; an impact listing without it is unusable |
 | `architecture` | — | kind-level condensation: `{kind, count}` nodes, `{from_kind, type, to_kind, count}` edges — the whole-map overview that is safe to render, and the usage precedent for vocabulary choices |
 | `schema` | — | the constitution: charter, kinds, relation types with descriptions and propagation — the agent's first stop before writing |
 
@@ -188,8 +205,8 @@ MCP tool descriptions are contract: each carries a one-line when-to-use (e.g. `l
 `laplace drift [--since REV] [--json]` — the session-start freshness audit in one call. Requires git.
 
 - **Base**: last commit touching the vault (`--since` overrides).
-- **Changed set**: paths changed since base, plus dirty working-tree paths, minus the schema's `ignore` globs (declared non-territory).
-- **Report**: `stale` — entities whose `source` globs match changed paths (`{ref, paths, commits}`); `uncovered` — changed paths matching no entity's globs (unmapped territory); `unanchored` — count and ratio of entities with no `source` (disclosed blindness, so silence is never mistaken for cleanliness).
+- **Changed set**: **git-tracked** paths changed since base, plus dirty working-tree paths, minus the schema's `ignore` globs — and always minus the vault directory itself (map maintenance is not unmapped territory). Operating on tracked paths means `.gitignore` is inherently respected; `ignore` exists for *tracked* noise (lockfiles, vendored reference code).
+- **Report**: `stale` — entities whose `source` globs match changed paths (`{ref, paths, commits}`); `uncovered` — changed paths matching no entity's globs (unmapped territory); `unanchored` — count and ratio of entities with no `source`; `dead-anchor` — anchors resolving only to git-untracked/ignored paths (they glob fine on disk, but git-driven drift can never watch them — a distinct failure from matching nothing, which `validate` catches). All four disclose blindness, so silence is never mistaken for cleanliness.
 - Per-entity file history additionally gives each entity its own last-touched timestamp for free.
 - Exit 0 always (informational). No git or zero anchors → explicit notice, never a silent pass.
 
@@ -237,7 +254,7 @@ Global: `--vault DIR`. Deliberate non-tools: no `fmt` (nothing to format — wri
 
 ## 9. Versioning & compatibility
 
-`apiVersion: laplace/v1` in `schema.yaml` only. Additive evolution within v1; breaking changes bump the major and readers refuse unknown majors with a clear message. Reserved for later definition: per-kind attribute schemas (`kinds.<k>.attributes`), body wikilink parsing as implicit "mentions" edges, lifecycle vocabularies, relation inverse display names. Deliberately rejected (recorded so they stay rejected): cardinality constraints (a map is not a database), kind hierarchies (tags cover classification; two mechanisms would fight), inference rules (the engine stays dumb — reasoning is the model's job), tag vocabularies (freedom is the feature).
+`apiVersion: laplace/v1` in `schema.yaml` only. Additive evolution within v1; breaking changes bump the major and readers refuse unknown majors with a clear message. Reserved for later definition: per-kind attribute schemas (`kinds.<k>.attributes`), a dedicated `kinds.<k>.guide` field (meanwhile: first sentence = label, rest = guide), body wikilink parsing as implicit "mentions" edges, lifecycle vocabularies, relation inverse display names, namespace facets in `architecture`. Deliberately rejected (recorded so they stay rejected): cardinality constraints (a map is not a database), kind hierarchies (tags cover classification; two mechanisms would fight), inference rules (the engine stays dumb — reasoning is the model's job), tag vocabularies (freedom is the feature), **per-edge propagation overrides** (heterogeneity under the two-question test means the type should split — overrides would dissolve the type-level economy of judgment), **temporal edge models** (the map asserts the present; the vault's git history is the time axis).
 
 ## 10. Implementation notes (non-normative)
 
