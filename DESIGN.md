@@ -12,6 +12,9 @@ As a project grows past a complexity threshold, an AI agent's picture of it drif
 2. **Single source of truth.** `laplace.yaml` is the only writable artifact. The graph is a derived cache; the summary and the HTML view are projections. Nothing else is ever authoritative.
 3. **The AI maintains, the human views.** The AI is the writer of the truth — in-session edits under the skill discipline, or a background agent. The human consumes projections (HTML view, injected summary) and hands entity references back. This division is what makes the map affordable to keep fresh.
 4. **Harness-agnostic by contract.** Laplace ships interfaces (CLI, MCP, summary text), not harness patches. Any agent harness integrates through the same contracts.
+5. **Laplace never writes the truth file** (`init` scaffolding excepted). Every command is read-only over `laplace.yaml`; the agent's editor is the sole writer. This is what keeps YAML comments and formatting alive — nothing ever round-trips through a serializer — and it keeps the tool honest: a projector, not a co-author.
+
+Normative format, validation, and query semantics: [docs/SPEC.md](docs/SPEC.md).
 
 ## Architecture
 
@@ -63,7 +66,7 @@ Three perception paths, one background channel, one accepted limitation:
 |---|---|---|
 | `laplace init` | CLI | scaffold `laplace.yaml` + schema preamble interactively or from a template |
 | `laplace validate` | CLI | schema + ref integrity; CI-friendly exit codes |
-| `laplace query <tool>` | CLI | `search`, `trace`, `impact`, `architecture`; JSON or text output |
+| `laplace query <tool>` | CLI | `search`, `get`, `neighbors`, `trace`, `impact`, `architecture`; JSON or text output (SPEC §4) |
 | `laplace summary` | CLI | entity index + relation digest + recent changes, **token-capped** (tiered truncation: counts → kind index → per-entity lines); designed to be injected into an agent's system context by the harness (Claude Code: CLAUDE.md snippet or SessionStart hook) |
 | `laplace serve` | CLI | read-only HTML view (tiny_http, GET-only) |
 | `laplace mcp` | MCP server (stdio) | the query tools for any MCP client; no write tools in v1 |
@@ -98,7 +101,7 @@ Three perception paths, one background channel, one accepted limitation:
 
 ## Milestones
 
-- **M1 — core**: format model, schema preamble + validation (JSON Schema), in-memory graph engine, `laplace validate`; two fixture projects in different domains (a codebase, a manuscript)
+- **M1 — core**: format model, schema preamble + validation, in-memory graph engine, `laplace validate`; two fixture projects in different domains — bingo (codebase) and 西游记·前七回 (narrative, Unicode-native refs)
 - **M2 — query**: `laplace query` CLI + `laplace mcp` server; correct results on both fixtures
 - **M3 — inject**: `laplace summary` with token cap + the `entity-map` skill; end-to-end: agent maintains the map on a fixture, summary + on-demand query replaces full-YAML reading
 - **M4 — view**: `laplace serve`; browse/search/filter/multi-select/copy-ref on both fixtures
