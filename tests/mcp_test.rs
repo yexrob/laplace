@@ -235,3 +235,79 @@ fn ureq_get(url: &str) -> String {
     conn.read_to_end(&mut buf).unwrap();
     String::from_utf8_lossy(&buf).into_owned()
 }
+
+/// The concurrency question, answered with a live process: a client that
+/// pipelines a burst of requests (what concurrent tool calls look like at the
+/// server boundary once the transport's single writer frames them) gets every
+/// one answered, garbage and notifications included, and the server survives.
+#[test]
+fn pipelined_burst_is_served_completely() {
+    let tmp = tempfile::tempdir().unwrap();
+    let vault = tmp.path().join("laplace");
+    copy_dir(
+        &PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/xiyouji/laplace"),
+        &vault,
+    );
+    let mut s = Server::start(&vault);
+    s.request("initialize", json!({ "protocolVersion": "2025-06-18" }));
+
+    // One burst, no reads in between: queries, writes, notifications,
+    // an unknown method, and a torn line of garbage.
+    let mut expected = Vec::new();
+    for (id, i) in (100u64..).zip(0..12) {
+        let msg = match i % 4 {
+            0 => json!({ "jsonrpc": "2.0", "id": id, "method": "tools/call",
+                "params": { "name": "laplace_search", "arguments": { "q": "悟空" } } }),
+            1 => json!({ "jsonrpc": "2.0", "id": id, "method": "tools/call",
+                "params": { "name": "laplace_get", "arguments": { "ref": "character:孙悟空" } } }),
+            2 => json!({ "jsonrpc": "2.0", "id": id, "method": "tools/call",
+                "params": { "name": "laplace_add", "arguments": {
+                    "kind": "event", "name": format!("并发测试-{i}"), "body": "洪峰里写下的一笔。" } } }),
+            _ => json!({ "jsonrpc": "2.0", "id": id, "method": "tools/list" }),
+        };
+        writeln!(s.stdin, "{msg}").unwrap();
+        expected.push(id);
+        if i == 5 {
+            // a notification (no id — must produce no response) and a garbage
+            // line (must produce exactly one id:null parse error)
+            writeln!(s.stdin, r#"{{"jsonrpc":"2.0","method":"notifications/cancelled"}}"#).unwrap();
+            writeln!(s.stdin, "{{torn json").unwrap();
+        }
+    }
+    writeln!(
+        s.stdin,
+        r#"{{"jsonrpc":"2.0","id":9999,"method":"no/such/method"}}"#
+    )
+    .unwrap();
+    s.stdin.flush().unwrap();
+
+    // Collect: 12 results + 1 parse error (id null) + 1 unknown-method error.
+    let mut got = Vec::new();
+    let mut null_errors = 0;
+    let mut unknown = 0;
+    for _ in 0..14 {
+        let mut line = String::new();
+        s.stdout.read_line(&mut line).unwrap();
+        let v: Value = serde_json::from_str(&line).unwrap();
+        if v["id"].is_null() {
+            assert_eq!(v["error"]["code"], -32700, "{v}");
+            null_errors += 1;
+        } else if v["id"] == 9999 {
+            assert_eq!(v["error"]["code"], -32601, "{v}");
+            unknown += 1;
+        } else {
+            assert!(v["error"].is_null(), "unexpected error: {v}");
+            assert_ne!(v["result"]["isError"], json!(true), "tool errored: {v}");
+            got.push(v["id"].as_u64().unwrap());
+        }
+    }
+    assert_eq!(got, expected, "every request answered, in arrival order");
+    assert_eq!((null_errors, unknown), (1, 1));
+
+    // The server is alive and still serves; the burst's writes really landed.
+    assert!(s.child.try_wait().unwrap().is_none(), "server exited");
+    s.next_id = 200;
+    let (err, text) = s.call_tool("laplace_search", json!({ "q": "并发测试" }));
+    assert!(!err, "{text}");
+    assert!(text.contains("并发测试-2"), "{text}");
+}

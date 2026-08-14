@@ -52,6 +52,8 @@
   header .brand { font-family: var(--mono); font-size: 12px; letter-spacing: 0.22em; }
   header .brand a { color: var(--ink); }
   header h1 { font-size: 19px; font-weight: 600; letter-spacing: 0.01em; }
+  header .hnav { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.1em; color: var(--ink-2); }
+  header .hnav:hover { color: var(--accent); }
   header .stats { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--ink-2); white-space: nowrap; }
   header .searchbox { position: relative; }
   header input {
@@ -77,22 +79,27 @@
   section { margin-bottom: 34px; }
   .sect-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px;
                padding-bottom: 5px; border-bottom: 1px solid var(--hair); }
+  .sect-head .figlink { margin-left: auto; }
+  .sect-head .figlink:hover { color: var(--accent); }
 
   .figure { border: 1px solid var(--hair); padding: 10px; overflow-x: auto; }
-  table.matrix { border-collapse: collapse; width: 100%; }
-  .matrix th, .matrix td { border: 1px solid var(--hair); padding: 8px 12px; vertical-align: top; }
-  .matrix th { font-family: var(--sans); font-size: 12px; font-weight: 500; text-align: left; }
-  .matrix th button { display: inline-flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 13px; }
-  .matrix th button:hover { color: var(--accent); }
-  .matrix th .count { color: var(--ink-2); font-size: 12px; }
-  .matrix td { font-family: var(--mono); font-size: 12.5px; line-height: 1.8; }
-  .matrix td.diag { background: var(--hair-soft); }
-  .matrix td.empty { color: var(--hair); text-align: center; }
-  .matrix td .n { color: var(--ink-2); }
-  .matrix .corner { color: var(--ink-2); font-family: var(--mono); font-size: 11px; }
+  .figure.axial { text-align: center; padding: 18px 10px; }
   .figcap {
     margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--hair-soft);
     font-family: var(--mono); font-size: 11px; color: var(--ink-2);
+  }
+  .platekey {
+    margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--hair-soft);
+    font-family: var(--mono); font-size: 11.5px; line-height: 1.9;
+    columns: 2; column-gap: 44px;
+  }
+  .platekey div { break-inside: avoid; }
+  .platekey .kpair { color: var(--ink); }
+  #tip {
+    position: fixed; z-index: 30; display: none; pointer-events: none;
+    background: var(--paper); border: 1px solid var(--ink);
+    padding: 6px 10px; max-width: 360px;
+    font-family: var(--mono); font-size: 11.5px; line-height: 1.7;
   }
 
   /* ── L0 ──────────────────────────────────────────────────── */
@@ -143,7 +150,7 @@
   .prose ul { margin: 0 0 12px 1.3em; }
   .anchors { border-top: 1px solid var(--hair); padding-top: 10px; }
   .anchors .mono { display: block; margin-top: 3px; }
-  .edges-list { margin-top: 18px; }
+  .edges-list { margin-top: 6px; }
   .edges-list .group { margin-bottom: 12px; }
   .edges-list .entrylink { display: block; padding: 3px 0 3px 14px; }
   .edges-list .entrylink:hover { color: var(--accent); }
@@ -172,16 +179,47 @@
                  stroke: var(--paper); stroke-width: 3px; }
   svg .node { cursor: pointer; }
   svg .node:hover rect, svg .node:hover circle { stroke: var(--accent); }
+  svg .halo { paint-order: stroke; stroke: var(--paper); stroke-width: 4px; }
+  svg .band { stroke: var(--ink-2); fill: none; }
+  svg .band.lit { stroke: var(--accent); }
+  svg .hit { stroke: transparent; fill: none; stroke-width: 18; pointer-events: stroke; }
+  svg .chip rect { fill: var(--paper); stroke: var(--hair); }
+  svg .chip text { font-size: 12px; }
+  svg .chip.lit rect { stroke: var(--accent); }
+  svg .chip.lit text { fill: var(--accent); }
   .errbox { border: 1px solid var(--ink); padding: 16px 20px; }
   .errbox pre { font-family: var(--mono); font-size: 12px; white-space: pre-wrap;
                 margin-top: 10px; color: var(--ink-2); }
   .flash { color: var(--accent); }
+
+  /* ── Plate II: constellation ─────────────────────────────── */
+  body.graphing main { max-width: none; padding: 0; margin: 0; }
+  #gwrap { position: relative; overflow: hidden; }
+  #gc { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+  #gwrap .g-hud {
+    position: absolute; top: 12px; left: 16px;
+    background: rgba(250, 249, 246, 0.88); border: 1px solid var(--hair); padding: 4px 10px;
+  }
+  .g-chips { position: absolute; top: 12px; right: 16px; display: flex; flex-wrap: wrap;
+             gap: 6px; max-width: 46%; justify-content: flex-end; }
+  .g-chips button {
+    font-family: var(--mono); font-size: 11px; padding: 2px 8px;
+    border: 1px solid var(--hair); background: rgba(250, 249, 246, 0.88);
+    display: inline-flex; gap: 6px; align-items: center;
+  }
+  .g-chips button.off { opacity: 0.35; }
+  .g-chips .swatch { width: 8px; height: 8px; }
+  .g-hint {
+    position: absolute; bottom: 10px; right: 16px; font-size: 10.5px; color: var(--ink-2);
+    background: rgba(250, 249, 246, 0.82); padding: 2px 8px;
+  }
 </style>
 </head>
 <body>
 <header>
   <span class="brand"><a href="#/">LAPLACE</a></span>
   <h1 id="vault-title">…</h1>
+  <a class="hnav" href="#/graph">✦ 星图 GRAPH</a>
   <span class="stats" id="stats"></span>
   <span class="searchbox">
     <input id="q" type="search" placeholder="/ search" autocomplete="off">
@@ -192,6 +230,7 @@
 <nav id="crumbs" hidden></nav>
 <main id="main"></main>
 <div id="selbar" hidden></div>
+<div id="tip"></div>
 
 <script>
 "use strict";
@@ -205,6 +244,8 @@ let inEdges = {}, outEdges = {}; // ref -> [edge]
 let symRels = new Set();
 let selected = new Set();  // multi-select refs (L1)
 let depth = 1;             // neighborhood depth
+let TIPS = [];             // tooltip payloads for [data-tipi]
+let gv = null;             // live constellation engine, null when unmounted
 
 const $ = (id) => document.getElementById(id);
 const elide = (ref) => ref.replace(":default/", ":");
@@ -232,9 +273,14 @@ async function boot() {
 
 /* ── router ─────────────────────────────────────────────────── */
 function route() {
+  if (gv) { gv.dispose(); gv = null; }
+  tipHide();
   const h = decodeURIComponent(location.hash);
+  const graphing = h.startsWith("#/graph");
+  document.body.classList.toggle("graphing", graphing);
   selected.clear(); renderSelbar();
-  if (h.startsWith("#/e/")) renderEntity(h.slice(4));
+  if (graphing) renderGraph(h);
+  else if (h.startsWith("#/e/")) renderEntity(h.slice(4));
   else if (h.startsWith("#/k/")) renderKind(h.slice(4));
   else renderOverview();
   window.scrollTo(0, 0);
@@ -248,7 +294,34 @@ function crumbs(parts) {
     .join(" › ");
 }
 
-/* ── L0: the overview plate ─────────────────────────────────── */
+/* ── tooltips: [data-tipi] elements + manual calls from canvas ── */
+function tipShow(html, x, y) {
+  const t = $("tip");
+  t.innerHTML = html;
+  t.style.display = "block";
+  const w = t.offsetWidth, h = t.offsetHeight;
+  t.style.left = Math.min(x + 14, window.innerWidth - w - 8) + "px";
+  t.style.top = Math.min(y + 14, window.innerHeight - h - 8) + "px";
+}
+function tipHide() { $("tip").style.display = "none"; }
+document.addEventListener("mousemove", (ev) => {
+  const el = ev.target.closest && ev.target.closest("[data-tipi]");
+  if (el && TIPS[+el.dataset.tipi] !== undefined) tipShow(TIPS[+el.dataset.tipi], ev.clientX, ev.clientY);
+  else if (!gv) tipHide();
+});
+document.addEventListener("mouseover", (ev) => {
+  const el = ev.target.closest && ev.target.closest("[data-band]");
+  if (!el) return;
+  for (const x of document.querySelectorAll(`[id="${el.dataset.band}"], [data-band="${el.dataset.band}"]`))
+    x.classList.add("lit");
+});
+document.addEventListener("mouseout", (ev) => {
+  const el = ev.target.closest && ev.target.closest("[data-band]");
+  if (!el) return;
+  for (const x of document.querySelectorAll(".lit")) x.classList.remove("lit");
+});
+
+/* ── L0: the condensation plate ─────────────────────────────── */
 function renderOverview() {
   crumbs([]);
   const s = D.schema;
@@ -259,49 +332,149 @@ function renderOverview() {
   if (s.exclusions.length)
     extras.push(`<div class="sect-head"><span class="lbl">Exclusions — deliberately not mapped</span></div>
                  <ul>${s.exclusions.map(x => `<li>${esc(x)}</li>`).join("")}</ul>`);
+  const P = platePairs();
   $("main").innerHTML = `
     ${charter}
     <section>
-      <div class="sect-head"><span class="lbl">Fig. 1 — Architecture matrix (row → column)</span></div>
-      <div class="figure">${matrixHTML()}
-        <div class="figcap">each cell: relations from the row kind to the column kind, with edge counts · headers carry entity counts · click a kind to open its register</div>
+      <div class="sect-head"><span class="lbl">Fig. 1 — Architecture (kind-level condensation)</span>
+        <a class="lbl figlink" href="#/graph">Plate II — constellation ✦</a></div>
+      <div class="figure">${plateSVG(P)}
+        <div class="figcap">圆 = kind，圆内数字 = 实体数（面积随之）· 弧带 = 聚合关系，箭头指向 to 端，粗细随边数 · 标牌 = 该向合计边数（单一关系型时直书其名）· 悬停看分型 · 点击 kind 进入图录</div>
+        ${plateKey(P)}
       </div>
     </section>
     ${extras.length ? `<section class="smallprint">${extras.join("")}</section>` : ""}`;
+  requestAnimationFrame(platePost);
 }
 
-/* Architecture matrix: kinds × kinds, cells list relation types with counts.
-   Zero label collisions at any density — the honest plate for dense maps. */
-function matrixHTML() {
-  const kinds = D.schema.kinds.map(k => k.kind);
+/* Aggregate edges per ordered kind pair — one band per direction, never
+   one curve per relation type. Density can no longer break the plate. */
+function platePairs() {
   const counts = {};
   for (const n of D.nodes) counts[n.kind] = (counts[n.kind] || 0) + 1;
-  const cell = {}; // "a|b" -> [{rel, n}]
+  const pairs = {};
   for (const e of D.edges) {
-    const a = byRef[e.from].kind, b = byRef[e.to].kind, key = a + "|" + b;
-    const list = (cell[key] = cell[key] || {});
-    list[e.rel] = (list[e.rel] || 0) + 1;
+    const a = byRef[e.from].kind, b = byRef[e.to].kind;
+    const p = (pairs[a + "|" + b] = pairs[a + "|" + b] || { from: a, to: b, rels: {}, total: 0 });
+    p.rels[e.rel] = (p.rels[e.rel] || 0) + 1; p.total++;
   }
-  const head = (k) =>
-    `<button onclick="location.hash='#/k/${encodeURIComponent(k)}'">
-       <span class="swatch" style="background:${kindTint[k]}"></span>${esc(k)}
-       <span class="count">· ${counts[k] || 0}</span></button>`;
-  let html = `<table class="matrix"><thead><tr><th class="corner">from ↓ · to →</th>`;
-  for (const k of kinds) html += `<th>${head(k)}</th>`;
-  html += `</tr></thead><tbody>`;
-  for (const a of kinds) {
-    html += `<tr><th>${head(a)}</th>`;
-    for (const b of kinds) {
-      const list = cell[a + "|" + b];
-      const cls = a === b ? "diag" : "";
-      if (!list) { html += `<td class="${cls} empty">·</td>`; continue; }
-      const lines = Object.entries(list).sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0], "zh"))
-        .map(([rel, n]) => `${esc(rel)} <span class="n">×${n}</span>`).join("<br>");
-      html += `<td class="${cls}">${lines}</td>`;
+  const list = Object.values(pairs);
+  for (const p of list) p.allSym = Object.keys(p.rels).every(r => symRels.has(r));
+  list.sort((x, y) => y.total - x.total);
+  return { counts, pairs: list };
+}
+function relLines(p) {
+  return Object.entries(p.rels).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "zh"));
+}
+function pairHead(p) {
+  return p.from === p.to ? `${esc(p.from)} ⟲`
+    : `${esc(p.from)} ${p.allSym ? "↔" : "→"} ${esc(p.to)}`;
+}
+
+function plateSVG(P) {
+  TIPS = [];
+  const kinds = D.schema.kinds.map(k => k.kind);
+  const W = 1080, H = 740, cx = W / 2, cy = H / 2 - 6, R = 218;
+  const pos = {};
+  kinds.forEach((k, i) => {
+    const a = -Math.PI / 2 + (2 * Math.PI * i) / Math.max(kinds.length, 1);
+    pos[k] = { x: cx + R * Math.cos(a), y: cy + R * Math.sin(a), a };
+  });
+  const rOf = (k) => Math.min(17 + Math.sqrt(P.counts[k] || 1) * 4.6, 52);
+  const maxT = Math.max(1, ...P.pairs.map(p => p.total));
+  const bw = (t) => (1 + 2.6 * Math.pow(t / maxT, 0.6)).toFixed(2);
+  let bands = "", hits = "", chips = "", nodes = "", pid = 0;
+  for (const p of P.pairs) {
+    const p1 = pos[p.from], p2 = pos[p.to];
+    if (!p1 || !p2) continue;
+    const id = "band" + (pid++);
+    const rl = relLines(p);
+    const chipTxt = rl.length === 1 ? `${rl[0][0]} ×${p.total}` : `×${p.total}`;
+    const ti = TIPS.push(`<b>${pairHead(p)}</b> · ${p.total} 条<br>` +
+      rl.map(([r, n]) => `${esc(r)} ×${n}`).join("<br>")) - 1;
+    const mark = p.allSym ? "" : ` marker-end="url(#arr)"`;
+    let d, chipX, chipY, onPath = id;
+    if (p.from === p.to) {
+      const r = rOf(p.from);
+      const a1 = p1.a - 0.55, a2 = p1.a + 0.55;
+      const sx = p1.x + r * Math.cos(a1), sy = p1.y + r * Math.sin(a1);
+      const ex = p1.x + r * Math.cos(a2), ey = p1.y + r * Math.sin(a2);
+      const c1x = p1.x + (r + 84) * Math.cos(p1.a - 0.62), c1y = p1.y + (r + 84) * Math.sin(p1.a - 0.62);
+      const c2x = p1.x + (r + 84) * Math.cos(p1.a + 0.62), c2y = p1.y + (r + 84) * Math.sin(p1.a + 0.62);
+      d = `M ${sx} ${sy} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${ex} ${ey}`;
+      chipX = p1.x + (r + 66) * Math.cos(p1.a); chipY = p1.y + (r + 66) * Math.sin(p1.a);
+      onPath = "";                       // loop chips hold their apex position
+    } else {
+      const dx = p2.x - p1.x, dy = p2.y - p1.y, len = Math.hypot(dx, dy) || 1;
+      const side = p.from.localeCompare(p.to, "zh") < 0 ? 1 : -1;
+      const off = Math.max(32, len * 0.13) * side;
+      const nx = -dy / len, ny = dx / len;
+      const t1 = (rOf(p.from) + 2) / len, t2 = 1 - (rOf(p.to) + 8) / len;
+      const sx = p1.x + dx * t1, sy = p1.y + dy * t1;
+      const ex = p1.x + dx * t2, ey = p1.y + dy * t2;
+      const qx = (p1.x + p2.x) / 2 + nx * off, qy = (p1.y + p2.y) / 2 + ny * off;
+      d = `M ${sx} ${sy} Q ${qx} ${qy} ${ex} ${ey}`;
+      chipX = 0.25 * sx + 0.5 * qx + 0.25 * ex; chipY = 0.25 * sy + 0.5 * qy + 0.25 * ey;
     }
-    html += `</tr>`;
+    bands += `<path id="${id}" class="band" style="stroke-width:${bw(p.total)}"${mark} d="${d}"/>`;
+    hits += `<path class="hit" data-tipi="${ti}" data-band="${id}" d="${d}"/>`;
+    chips += `<g class="chip" data-tipi="${ti}" data-band="${id}" data-path="${onPath}"
+      data-x="${chipX}" data-y="${chipY}" transform="translate(${chipX},${chipY})">
+      <text text-anchor="middle" dominant-baseline="central">${esc(chipTxt)}</text></g>`;
   }
-  return html + `</tbody></table>`;
+  for (const k of kinds) {
+    const p = pos[k], r = rOf(k);
+    const below = Math.sin(p.a) < 0.55;  // label under the node unless it sits at the bottom
+    const ly = below ? p.y + r + 22 : p.y - r - 14;
+    const ti = TIPS.push(`<b>${esc(k)}</b> · ${P.counts[k] || 0} 个实体<br>点击进入图录`) - 1;
+    nodes += `<g class="node" data-tipi="${ti}" onclick="location.hash='#/k/${encodeURIComponent(k)}'">
+      <circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${kindTint[k]}26" stroke="${kindTint[k]}" stroke-width="1.5"/>
+      <text x="${p.x}" y="${p.y}" text-anchor="middle" dominant-baseline="central" font-size="16" font-weight="600">${P.counts[k] || 0}</text>
+      <text class="halo" x="${p.x}" y="${ly}" text-anchor="middle" font-size="13.5">${esc(k)}</text></g>`;
+  }
+  const defs = `<defs><marker id="arr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6.5" markerHeight="6.5" orient="auto">
+    <path d="M0,0 L8,4 L0,8 z" fill="#6A6F76"/></marker></defs>`;
+  return `<svg id="platesvg" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="architecture condensation">${defs}${bands}${hits}${chips}${nodes}</svg>`;
+}
+
+/* Post-mount pass: size each chip's plate to its measured text, then slide
+   overlapping chips along their band until every plate has clear paper. */
+function platePost() {
+  const svg = $("platesvg");
+  if (!svg) return;
+  const placed = [];
+  const PADC = 5; // breathing room between chips
+  const overlaps = (b) => placed.some(o =>
+    !(b.x - PADC > o.x + o.w || o.x > b.x + b.w + PADC || b.y - PADC > o.y + o.h || o.y > b.y + b.h + PADC));
+  for (const chip of svg.querySelectorAll(".chip")) {
+    const text = chip.querySelector("text");
+    const bb = text.getBBox();
+    const w = bb.width + 16, h = bb.height + 8;
+    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    rect.setAttribute("x", (-w / 2).toFixed(1)); rect.setAttribute("y", (-h / 2).toFixed(1));
+    rect.setAttribute("width", w.toFixed(1)); rect.setAttribute("height", h.toFixed(1));
+    chip.insertBefore(rect, text);
+    let x = +chip.dataset.x, y = +chip.dataset.y;
+    const path = chip.dataset.path && svg.querySelector("#" + chip.dataset.path);
+    if (path) {
+      const L = path.getTotalLength();
+      for (const dt of [0, 0.07, -0.07, 0.14, -0.14, 0.21, -0.21, 0.3, -0.3, 0.38, -0.38]) {
+        const pt = path.getPointAtLength(L * (0.5 + dt));
+        if (!overlaps({ x: pt.x - w / 2, y: pt.y - h / 2, w, h })) { x = pt.x; y = pt.y; break; }
+      }
+    }
+    chip.setAttribute("transform", `translate(${x},${y})`);
+    placed.push({ x: x - w / 2, y: y - h / 2, w, h });
+  }
+}
+
+/* The ledger under the plate: every ordered pair with its relation split.
+   This is where relation names live when a band carries several. */
+function plateKey(P) {
+  if (!P.pairs.length) return "";
+  const line = (p) => `<div><span class="kpair">${pairHead(p)}</span>&ensp;<span class="dim">${
+    relLines(p).map(([r, n]) => `${esc(r)} ×${n}`).join(" · ")}</span></div>`;
+  return `<div class="platekey">${P.pairs.map(line).join("")}</div>`;
 }
 
 /* ── L1: the kind register ──────────────────────────────────── */
@@ -368,6 +541,7 @@ function renderEntity(ref) {
   const anchors = n.source.length
     ? `<div class="anchors"><span class="lbl">Source anchors</span>${n.source.map(s => `<span class="mono dim">${esc(s)}</span>`).join("")}</div>`
     : "";
+  const edges = edgesListHTML(n);
   $("main").innerHTML = `
     <div class="entry-grid">
       <article class="entry">
@@ -380,19 +554,23 @@ function renderEntity(ref) {
         <p class="mono dim" style="margin-top:10px;font-size:11px">${esc(n.file)}</p>
       </article>
       <aside>
-        <div class="sect-head"><span class="lbl">Fig. — Neighborhood</span>
-          <span class="depth-toggle">
-            <button class="${depth === 1 ? "on" : ""}" onclick="depth=1;route()">1 HOP</button>
-            <button class="${depth === 2 ? "on" : ""}" onclick="depth=2;route()">2 HOPS</button>
-          </span></div>
-        <div class="figure">${axialSVG(n)}</div>
-        ${edgesListHTML(n)}
+        <div class="sect-head"><span class="lbl">Relations</span></div>
+        ${edges || '<p class="dim">isolated entry — no relations either way</p>'}
       </aside>
-    </div>`;
+    </div>
+    <section style="margin-top:30px">
+      <div class="sect-head"><span class="lbl">Fig. — Neighborhood</span>
+        <span class="depth-toggle">
+          <button class="${depth === 1 ? "on" : ""}" onclick="depth=1;route()">1 HOP</button>
+          <button class="${depth === 2 ? "on" : ""}" onclick="depth=2;route()">2 HOPS</button>
+        </span></div>
+      <div class="figure axial">${axialSVG(n)}</div>
+    </section>`;
 }
 
-/* Axial neighborhood: inbound | center | outbound, grouped by relation.
-   Group headers carry the label once; member lines stay silent. */
+/* Axial neighborhood at natural pixel size — never scaled down. Full main
+   width, box width measured from the labels it must hold, sides that do
+   not exist claim no space. */
 function axialSVG(center) {
   const inn = inEdges[center.ref].map(e => ({ other: e.from, rel: e.rel, sym: symRels.has(e.rel) }));
   const out = outEdges[center.ref].map(e => ({ other: e.to, rel: e.rel, sym: symRels.has(e.rel) }));
@@ -407,11 +585,27 @@ function axialSVG(center) {
   if (!left.length && !right.length)
     return `<p class="dim" style="padding:6px">isolated entry — no relations either way</p>`;
 
-  const ROW = 34, HEAD = 24, PAD = 12, BW = 188, BH = 28, GAP = 104, OUTER = 140;
+  const FS = 13.5, HFS = 12.5, OFS = 11.5;
+  const ROW = 38, HEAD = 27, PAD = 16, BH = 31, GAP = 84, OUTER = 148, M = 14;
+  const cjkRe = /[⺀-鿿　-ヿ豈-﫿＀-｠]/;
+  const pxw = (t, f) => { let w = 0; for (const ch of t) w += cjkRe.test(ch) ? f : f * 0.61; return w; };
+  const clip = (t, f, max) => {
+    if (pxw(t, f) <= max) return t;
+    let s = "";
+    for (const ch of t) { if (pxw(s + ch, f) + f > max) break; s += ch; }
+    return s + "…";
+  };
+  const labelOf = (ref) => { const n = byRef[ref]; return n.title || n.name; };
+  const allLabels = [center.title || center.name]
+    .concat(left.flatMap(g => g.refs.map(labelOf)), right.flatMap(g => g.refs.map(labelOf)));
+  const BW = Math.min(Math.max(200, Math.ceil(Math.max(...allLabels.map(l => pxw(l, FS)))) + 28), 300);
+  const hasL = left.length > 0, hasR = right.length > 0;
+  const oxL = depth === 2 && hasL ? OUTER : M, oxR = depth === 2 && hasR ? OUTER : M;
+  const xL = oxL, xC = oxL + (hasL ? BW + GAP : 0), xR = xC + BW + GAP;
+  const W = xC + BW + (hasR ? GAP + BW : 0) + oxR;
   const sideH = (gs) => gs.reduce((h, g) => h + HEAD + g.refs.length * ROW + PAD, 0);
-  const H = Math.max(sideH(left), sideH(right), 90) + 16;
-  const W = BW * 3 + GAP * 2 + 8;
-  const cxL = 4, cxC = BW + GAP + 4, cxR = 2 * (BW + GAP) + 4, cyC = H / 2;
+  const H = Math.max(sideH(left), sideH(right), 96) + 20;
+  const cyC = H / 2;
 
   let s = "";
   const seen = new Set([center.ref]);
@@ -419,49 +613,48 @@ function axialSVG(center) {
   right.forEach(g => g.refs.forEach(r => seen.add(r)));
 
   const drawSide = (groups, x, isLeft) => {
-    let y = 8, out = "";
+    let y = 10, o = "";
     for (const g of groups) {
       const head = isLeft ? `${g.rel} ×${g.refs.length} →` : `→ ${g.rel} ×${g.refs.length}`;
-      out += `<text x="${isLeft ? x + BW : x}" y="${y + 12}" font-size="11.5" fill="#6A6F76"
-                text-anchor="${isLeft ? "end" : "start"}" letter-spacing="1">${esc(head)}</text>`;
+      o += `<text x="${isLeft ? x + BW : x}" y="${y + 13}" font-size="${HFS}" fill="#6A6F76"
+              text-anchor="${isLeft ? "end" : "start"}" letter-spacing="1">${esc(head)}</text>`;
       y += HEAD;
       for (const ref of g.refs) {
         const n = byRef[ref], tint = kindTint[n.kind];
-        const label = (n.title || n.name);
-        const disp = label.length > 12 ? label.slice(0, 11) + "…" : label;
-        out += `<line class="edge faint" x1="${isLeft ? x + BW : cxC + BW}" y1="${isLeft ? y + BH / 2 : cyC}"
-                  x2="${isLeft ? cxC - 4 : x - 4}" y2="${isLeft ? cyC : y + BH / 2}"/>`;
-        out += `<g class="node" onclick="location.hash='#/e/${encodeURIComponent(ref)}'">
+        const disp = clip(labelOf(ref), FS, BW - 26);
+        o += `<line class="edge faint" x1="${isLeft ? x + BW : xC + BW}" y1="${isLeft ? y + BH / 2 : cyC}"
+                x2="${isLeft ? xC - 4 : x - 4}" y2="${isLeft ? cyC : y + BH / 2}"/>`;
+        o += `<g class="node" onclick="location.hash='#/e/${encodeURIComponent(ref)}'">
           <title>${esc(ref)}</title>
           <rect x="${x}" y="${y}" width="${BW}" height="${BH}" fill="${tint}14" stroke="var(--hair)"/>
           <rect x="${x}" y="${y}" width="3" height="${BH}" fill="${tint}"/>
-          <text x="${x + 10}" y="${y + BH / 2 + 4.5}" font-size="13">${esc(disp)}</text></g>`;
+          <text x="${x + 11}" y="${y + BH / 2 + 4.5}" font-size="${FS}">${esc(disp)}</text></g>`;
         if (depth === 2) {
           const nbrs = [...outEdges[ref], ...inEdges[ref]]
             .map(e2 => (e2.from === ref ? e2.to : e2.from))
             .filter(r2 => !seen.has(r2)).filter((r2, k, arr) => arr.indexOf(r2) === k).slice(0, 2);
           nbrs.forEach((r2, j2) => {
-            const yy = y + BH / 2 + (j2 - (nbrs.length - 1) / 2) * 15;
-            const x1 = isLeft ? x : x + BW, x2 = isLeft ? x1 - 40 : x1 + 40;
-            const n2 = byRef[r2];
-            out += `<g class="node" opacity="0.55" onclick="location.hash='#/e/${encodeURIComponent(r2)}'">
+            const yy = y + BH / 2 + (j2 - (nbrs.length - 1) / 2) * 17;
+            const x1 = isLeft ? x : x + BW, x2 = isLeft ? x1 - 46 : x1 + 46;
+            const lbl = clip(labelOf(r2), OFS, OUTER - 56);
+            o += `<g class="node" opacity="0.6" onclick="location.hash='#/e/${encodeURIComponent(r2)}'">
               <title>${esc(r2)}</title>
               <line class="edge faint" x1="${x1}" y1="${y + BH / 2}" x2="${x2}" y2="${yy}"/>
-              <text x="${isLeft ? x2 - 4 : x2 + 4}" y="${yy + 3.5}" font-size="10"
-                text-anchor="${isLeft ? "end" : "start"}">${esc((n2.title || n2.name).slice(0, 8))}</text></g>`;
+              <text x="${isLeft ? x2 - 5 : x2 + 5}" y="${yy + 3.5}" font-size="${OFS}"
+                text-anchor="${isLeft ? "end" : "start"}">${esc(lbl)}</text></g>`;
           });
         }
         y += ROW;
       }
       y += PAD;
     }
-    return out;
+    return o;
   };
-  s += drawSide(left, cxL, true) + drawSide(right, cxR, false);
-  s += `<rect x="${cxC}" y="${cyC - BH / 2 - 2}" width="${BW}" height="${BH + 4}" fill="none" stroke="var(--ink)" stroke-width="1.2"/>
-        <text x="${cxC + 10}" y="${cyC + 4.5}" font-size="13.5" font-weight="600">${esc((center.title || center.name).slice(0, 12))}</text>`;
-  const ox = depth === 2 ? OUTER : 0;
-  return `<svg viewBox="${-ox} 0 ${W + ox * 2} ${H}" width="100%" role="img" aria-label="neighborhood">${s}</svg>`;
+  s += drawSide(left, xL, true) + drawSide(right, xR, false);
+  const cdisp = clip(center.title || center.name, FS, BW - 26);
+  s += `<rect x="${xC}" y="${cyC - BH / 2 - 2}" width="${BW}" height="${BH + 4}" fill="none" stroke="var(--ink)" stroke-width="1.2"/>
+        <text x="${xC + 11}" y="${cyC + 4.5}" font-size="${FS}" font-weight="600">${esc(cdisp)}</text>`;
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="neighborhood">${s}</svg>`;
 }
 
 function edgesListHTML(n) {
@@ -478,6 +671,441 @@ function edgesListHTML(n) {
       ${groups[k].map(t => `<a class="entrylink" href="#/e/${encodeURIComponent(t.ref)}">
         <span class="mono">${esc(elide(t.ref))}</span>${t.note ? `<span class="note"> — ${esc(t.note)}</span>` : ""}</a>`).join("")}
     </div>`).join("")}</div>`;
+}
+
+/* ── Plate II: the constellation ────────────────────────────── */
+/* Whole-vault force graph on canvas. Typed arrays, Barnes-Hut repulsion,
+   batched drawing, label LOD — and a strict idle contract: when the layout
+   has settled and nothing is interacting, no frame is scheduled at all. */
+function renderGraph(hash) {
+  crumbs([]);
+  const stress = +(hash.match(/stress=(\d+)/) || [])[1] || 0;
+  $("main").innerHTML = `
+    <div id="gwrap">
+      <canvas id="gc"></canvas>
+      <div class="g-hud lbl">Plate II — 全域星图 · <span id="gcount"></span></div>
+      <div class="g-chips" id="gchips"></div>
+      <div class="g-hint mono">拖拽平移 · 滚轮缩放 · 悬停照亮邻域 · 点击进入词条 · 拖动节点重排 · esc 返回</div>
+    </div>`;
+  const model = stress ? stressModel(stress) : vaultModel();
+  $("gcount").textContent =
+    `${model.nodes.length} entities · ${model.edges.length / 2} relations` + (stress ? " · stress" : "");
+  const chips = $("gchips");
+  chips.innerHTML = model.kinds.map((k, i) =>
+    `<button data-ki="${i}"><span class="swatch" style="background:${model.tints[i]}"></span>${esc(k)}</button>`).join("");
+  gv = constellation($("gc"), model);
+  chips.addEventListener("click", (ev) => {
+    const b = ev.target.closest("button[data-ki]");
+    if (!b) return;
+    b.classList.toggle("off");
+    gv.toggleKind(+b.dataset.ki, !b.classList.contains("off"));
+  });
+}
+function vaultModel() {
+  const kinds = D.schema.kinds.map(k => k.kind);
+  const nodes = D.nodes.map(n => ({ ref: n.ref, label: n.title || n.name, ki: Math.max(0, kinds.indexOf(n.kind)) }));
+  const idx = {}; nodes.forEach((n, i) => idx[n.ref] = i);
+  const edges = [];
+  for (const e of D.edges) edges.push(idx[e.from], idx[e.to]);
+  return { kinds, tints: kinds.map(k => kindTint[k]), nodes, edges, live: true };
+}
+function stressModel(n) {
+  // Deterministic synthetic graph for performance verification (#/graph?stress=N).
+  const kinds = ["α", "β", "γ", "δ", "ε", "ζ"];
+  let seed = 42;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  const nodes = [], edges = [];
+  for (let i = 0; i < n; i++) nodes.push({ ref: "s:" + i, label: "node-" + i, ki: i % 6 });
+  for (let i = 1; i < n; i++) {
+    edges.push(i, Math.floor(rnd() * i));
+    if (rnd() < 0.6) edges.push(i, Math.floor(rnd() * i));
+  }
+  return { kinds, tints: kinds.map((_, i) => TINTS[i % TINTS.length]), nodes, edges, live: false };
+}
+
+function constellation(canvas, model) {
+  const N = model.nodes.length, E = model.edges.length / 2;
+  const px = new Float32Array(N), py = new Float32Array(N);
+  const vx = new Float32Array(N), vy = new Float32Array(N);
+  const deg = new Int32Array(N), ki = new Int32Array(N);
+  const ed = new Int32Array(model.edges);
+  model.nodes.forEach((n, i) => ki[i] = n.ki);
+  for (let i = 0; i < 2 * E; i++) deg[ed[i]]++;
+  // CSR adjacency for neighborhood highlight
+  const off = new Int32Array(N + 1);
+  for (let i = 0; i < 2 * E; i++) off[ed[i] + 1]++;
+  for (let i = 0; i < N; i++) off[i + 1] += off[i];
+  const adj = new Int32Array(2 * E), cur = Int32Array.from(off.subarray(0, N));
+  for (let i = 0; i < E; i++) {
+    const a = ed[2 * i], b = ed[2 * i + 1];
+    adj[cur[a]++] = b; adj[cur[b]++] = a;
+  }
+  const rad = new Float32Array(N);
+  for (let i = 0; i < N; i++) rad[i] = Math.min(2.8 + 1.5 * Math.sqrt(deg[i]), 11);
+  // hubs keep their labels at any zoom
+  const dsorted = Int32Array.from(deg).sort();
+  const hubCut = Math.max(6, dsorted[Math.min(N - 1, Math.floor(N * 0.94))]);
+
+  // deterministic clustered seed: kind centers on a ring, phyllotaxis within
+  const K = Math.max(1, model.kinds.length);
+  const kn = new Int32Array(K), GA = 2.399963;
+  const CR = 60 + 9 * Math.sqrt(N);
+  for (let i = 0; i < N; i++) {
+    const j = kn[ki[i]]++;
+    const ca = -Math.PI / 2 + (2 * Math.PI * ki[i]) / K;
+    const rr = 11 * Math.sqrt(j), th = j * GA;
+    px[i] = Math.cos(ca) * CR + rr * Math.cos(th);
+    py[i] = Math.sin(ca) * CR + rr * Math.sin(th);
+  }
+
+  /* pooled quadtree: cells as parallel arrays, grown on demand */
+  let cap = 8 * N + 64;
+  let qch, qm, qx, qy, qpt, qhs, qcx, qcy;
+  const qalloc = () => {
+    qch = new Int32Array(4 * cap); qm = new Float32Array(cap);
+    qx = new Float32Array(cap); qy = new Float32Array(cap);
+    qpt = new Int32Array(cap); qhs = new Float32Array(cap);
+    qcx = new Float32Array(cap); qcy = new Float32Array(cap);
+  };
+  qalloc();
+  let qn = 0;
+  const newCell = (cx0, cy0, hs) => {
+    if (qn >= cap) { // grow: copy-free rebuild is fine, growth is once-ever
+      cap *= 2;
+      const o = { qch, qm, qx, qy, qpt, qhs, qcx, qcy };
+      qalloc();
+      qch.set(o.qch); qm.set(o.qm); qx.set(o.qx); qy.set(o.qy);
+      qpt.set(o.qpt); qhs.set(o.qhs); qcx.set(o.qcx); qcy.set(o.qcy);
+    }
+    const c = qn++;
+    qch[4 * c] = qch[4 * c + 1] = qch[4 * c + 2] = qch[4 * c + 3] = -1;
+    qm[c] = 0; qx[c] = 0; qy[c] = 0; qpt[c] = -2; qcx[c] = cx0; qcy[c] = cy0; qhs[c] = hs;
+    return c;
+  };
+  const childFor = (c, i) => {
+    const q = (px[i] > qcx[c] ? 1 : 0) | (py[i] > qcy[c] ? 2 : 0);
+    let ch = qch[4 * c + q];
+    if (ch === -1) {
+      const hs = qhs[c] / 2;
+      ch = newCell(qcx[c] + (q & 1 ? hs : -hs), qcy[c] + (q & 2 ? hs : -hs), hs);
+      qch[4 * c + q] = ch;
+    }
+    return ch;
+  };
+  const qbuild = () => {
+    let minx = 1e30, miny = 1e30, maxx = -1e30, maxy = -1e30;
+    for (let i = 0; i < N; i++) {
+      if (px[i] < minx) minx = px[i]; if (px[i] > maxx) maxx = px[i];
+      if (py[i] < miny) miny = py[i]; if (py[i] > maxy) maxy = py[i];
+    }
+    qn = 0;
+    newCell((minx + maxx) / 2, (miny + maxy) / 2, Math.max(maxx - minx, maxy - miny) / 2 + 1);
+    for (let i = 0; i < N; i++) {
+      let c = 0;
+      for (let d = 0; d < 48; d++) {
+        qm[c]++; qx[c] += px[i]; qy[c] += py[i];
+        if (qpt[c] === -2 && qch[4 * c] === -1 && qch[4 * c + 1] === -1 && qch[4 * c + 2] === -1 && qch[4 * c + 3] === -1) { qpt[c] = i; break; }
+        if (qpt[c] >= 0) {
+          const old = qpt[c]; qpt[c] = -1;
+          if (px[old] === px[i] && py[old] === py[i]) { px[i] += 0.01 * ((i % 7) - 3) + 0.005; py[i] += 0.01; }
+          const co = childFor(c, old);
+          qm[co]++; qx[co] += px[old]; qy[co] += py[old]; qpt[co] = old;
+        }
+        c = childFor(c, i);
+      }
+    }
+    for (let c = 0; c < qn; c++) if (qm[c] > 0) { qx[c] /= qm[c]; qy[c] /= qm[c]; }
+  };
+  const stack = new Int32Array(128);
+  const TH2 = 0.81; // θ² with θ = 0.9
+  const KREP = -2600;
+  const repelInto = (i, alpha) => {
+    let sp = 0; stack[sp++] = 0;
+    const xi = px[i], yi = py[i];
+    let ax = 0, ay = 0;
+    while (sp > 0) {
+      const c = stack[--sp];
+      if (qm[c] === 0) continue;
+      const dx = qx[c] - xi, dy = qy[c] - yi;
+      let d2 = dx * dx + dy * dy;
+      const leafSelf = qpt[c] === i;
+      const far = (4 * qhs[c] * qhs[c]) / (d2 || 1) < TH2;
+      if (qpt[c] !== -1 || far) {          // leaf or far cell: apply
+        if (leafSelf) continue;
+        if (d2 < 1) d2 = 1;
+        const f = (KREP * alpha * qm[c]) / d2;
+        const d = Math.sqrt(d2);
+        ax += (dx / d) * f; ay += (dy / d) * f;
+      } else {
+        for (let q = 0; q < 4; q++) { const ch = qch[4 * c + q]; if (ch !== -1) stack[sp++] = ch; }
+      }
+    }
+    vx[i] += ax; vy[i] += ay;
+  };
+
+  let alpha = 1;
+  const AMIN = 0.004;
+  const tick = () => {
+    qbuild();
+    for (let i = 0; i < N; i++) repelInto(i, alpha);
+    for (let e = 0; e < E; e++) {                       // springs, d3-flavored
+      const a = ed[2 * e], b = ed[2 * e + 1];
+      let dx = px[b] - px[a], dy = py[b] - py[a];
+      let d = Math.hypot(dx, dy) || 1;
+      const L = rad[a] + rad[b] + 46;
+      const k = (alpha * 0.9) / Math.min(deg[a], deg[b] || 1);
+      const f = ((d - L) / d) * k;
+      const bias = deg[a] / (deg[a] + deg[b] || 1);
+      vx[b] -= dx * f * bias; vy[b] -= dy * f * bias;
+      vx[a] += dx * f * (1 - bias); vy[a] += dy * f * (1 - bias);
+    }
+    let mx = 0, my = 0;
+    for (let i = 0; i < N; i++) {
+      vx[i] += -px[i] * 0.009 * alpha; vy[i] += -py[i] * 0.009 * alpha;   // weak containment
+      mx += px[i]; my += py[i];
+    }
+    mx /= N; my /= N;
+    for (let i = 0; i < N; i++) {
+      if (i === dragI) { vx[i] = 0; vy[i] = 0; px[i] = dragX; py[i] = dragY; continue; }
+      vx[i] *= 0.6; vy[i] *= 0.6;
+      px[i] += vx[i] - mx * 0.06; py[i] += vy[i] - my * 0.06;             // recenter drift
+    }
+    alpha += (0 - alpha) * 0.026;
+  };
+
+  /* view + render */
+  const ctx = canvas.getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  let cw = 0, chh = 0, sc = 1, ox = 0, oy = 0;
+  let hover = -1, dragI = -1, dragX = 0, dragY = 0;
+  let autoFit = true;  // frame the whole constellation until the user takes the view
+  const fit = () => {
+    let minx = 1e30, miny = 1e30, maxx = -1e30, maxy = -1e30;
+    for (let i = 0; i < N; i++) {
+      if (px[i] < minx) minx = px[i]; if (px[i] > maxx) maxx = px[i];
+      if (py[i] < miny) miny = py[i]; if (py[i] > maxy) maxy = py[i];
+    }
+    const w = Math.max(maxx - minx, 1), h = Math.max(maxy - miny, 1), M = 70;
+    sc = Math.min(2.2, Math.max(0.15, Math.min((cw - 2 * M) / w, (chh - 2 * M) / h)));
+    ox = cw / 2 - ((minx + maxx) / 2) * sc;
+    oy = chh / 2 - ((miny + maxy) / 2) * sc;
+  };
+  const hidden = new Set();
+  const EDGE = "rgba(31,35,40,0.15)", EDGE_DIM = "rgba(31,35,40,0.045)", EDGE_LIT = "rgba(29,78,137,0.65)";
+  const INK = "#1F2328";
+  const stats = { n: N, e: E, tickMs: 0, drawMs: 0, alpha: 1, frames: 0 };
+  window.__gstats = stats;
+  // label painting order: high degree wins contested paper
+  const lorder = Array.from({ length: N }, (_, i) => i).sort((a, b) => deg[b] - deg[a]);
+  const lw = new Float32Array(N); // measured label widths, filled lazily on first label pass
+  const kindList = []; // node indices grouped by kind for batched fills
+  for (let k = 0; k < K; k++) kindList.push([]);
+  for (let i = 0; i < N; i++) kindList[ki[i]].push(i);
+  const isNbr = (i) => {
+    if (hover < 0) return false;
+    if (i === hover) return true;
+    for (let a = off[hover]; a < off[hover + 1]; a++) if (adj[a] === i) return true;
+    return false;
+  };
+
+  const size = () => {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    cw = rect.width; chh = rect.height;
+    canvas.width = Math.round(cw * dpr); canvas.height = Math.round(chh * dpr);
+    if (autoFit) fit(); else if (ox === 0 && oy === 0) { ox = cw / 2; oy = chh / 2; }
+  };
+  const draw = () => {
+    const t0 = performance.now();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.setTransform(dpr * sc, 0, 0, dpr * sc, dpr * ox, dpr * oy);
+    const vx0 = -ox / sc, vy0 = -oy / sc, vx1 = (cw - ox) / sc, vy1 = (chh - oy) / sc;
+    const vis = (i, m) => px[i] > vx0 - m && px[i] < vx1 + m && py[i] > vy0 - m && py[i] < vy1 + m;
+    ctx.lineWidth = Math.max(0.5, 1 / sc);
+    // edges: one dim batch, then (on hover) one lit batch for incident edges
+    const litEdge = (a, b) => hover >= 0 && (a === hover || b === hover);
+    ctx.strokeStyle = hover >= 0 ? EDGE_DIM : EDGE;
+    ctx.beginPath();
+    for (let e = 0; e < E; e++) {
+      const a = ed[2 * e], b = ed[2 * e + 1];
+      if (hidden.has(ki[a]) || hidden.has(ki[b]) || litEdge(a, b)) continue;
+      if (!vis(a, 40) && !vis(b, 40)) continue;
+      ctx.moveTo(px[a], py[a]); ctx.lineTo(px[b], py[b]);
+    }
+    ctx.stroke();
+    if (hover >= 0) {
+      ctx.strokeStyle = EDGE_LIT;
+      ctx.lineWidth = Math.max(0.8, 1.4 / sc);
+      ctx.beginPath();
+      for (let e = 0; e < E; e++) {
+        const a = ed[2 * e], b = ed[2 * e + 1];
+        if (!litEdge(a, b) || hidden.has(ki[a]) || hidden.has(ki[b])) continue;
+        ctx.moveTo(px[a], py[a]); ctx.lineTo(px[b], py[b]);
+      }
+      ctx.stroke();
+    }
+    // nodes, batched per kind; when hovering, non-neighbors fade
+    for (let pass = 0; pass < (hover >= 0 ? 2 : 1); pass++) {
+      ctx.globalAlpha = hover >= 0 ? (pass === 0 ? 0.16 : 1) : 1;
+      for (let k = 0; k < K; k++) {
+        if (hidden.has(k)) continue;
+        ctx.fillStyle = model.tints[k];
+        ctx.beginPath();
+        for (const i of kindList[k]) {
+          if (!vis(i, 14)) continue;
+          if (hover >= 0 && isNbr(i) !== (pass === 1)) continue;
+          ctx.moveTo(px[i] + rad[i], py[i]);
+          ctx.arc(px[i], py[i], rad[i], 0, 6.2832);
+        }
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+    if (hover >= 0 && !hidden.has(ki[hover])) {
+      ctx.strokeStyle = INK; ctx.lineWidth = 1.6 / sc;
+      ctx.beginPath(); ctx.arc(px[hover], py[hover], rad[hover] + 2 / sc, 0, 6.2832); ctx.stroke();
+    }
+    // labels in screen space: crisp at every zoom; LOD keeps them honest,
+    // greedy declutter (degree first) keeps them off each other
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.font = '10.5px ui-monospace, "SF Mono", Menlo, monospace';
+    ctx.textAlign = "center";
+    const labelAll = sc >= (N > 400 ? 1.5 : 0.9);
+    const taken = [];
+    const free = (x, y, w) => {
+      if (taken.length > 400) return true;
+      for (const t of taken)
+        if (!(x + w < t[0] || t[0] + t[2] < x || y + 13 < t[1] || t[1] + 13 < y)) return false;
+      return true;
+    };
+    let drawn = 0;
+    for (const i of lorder) {
+      if (drawn >= 500) break;
+      if (hidden.has(ki[i])) continue;
+      const nb = hover >= 0 && isNbr(i);
+      if (!(nb || (hover < 0 && (labelAll || deg[i] >= hubCut)))) continue;
+      const sx = px[i] * sc + ox, sy = py[i] * sc + oy;
+      if (sx < -60 || sx > cw + 60 || sy < -20 || sy > chh + 20) continue;
+      if (!lw[i]) lw[i] = ctx.measureText(model.nodes[i].label).width;
+      const ly = sy + rad[i] * sc + 12;
+      if (!nb && !free(sx - lw[i] / 2, ly - 10, lw[i])) continue;
+      taken.push([sx - lw[i] / 2, ly - 10, lw[i]]);
+      ctx.globalAlpha = nb || labelAll ? 0.85 : 0.55;
+      ctx.fillStyle = INK;
+      ctx.fillText(model.nodes[i].label, sx, ly);
+      drawn++;
+    }
+    ctx.globalAlpha = 1;
+    stats.drawMs = stats.drawMs * 0.9 + (performance.now() - t0) * 0.1;
+  };
+
+  /* the idle contract: no scheduled frame unless simulating or dirtied */
+  let raf = 0, needDraw = true, disposed = false;
+  const wake = () => { if (!raf && !disposed) raf = requestAnimationFrame(frame); };
+  const frame = () => {
+    raf = 0;
+    if (disposed || !canvas.isConnected) return;
+    if (alpha > AMIN) {
+      const t0 = performance.now();
+      tick();
+      stats.tickMs = stats.tickMs * 0.9 + (performance.now() - t0) * 0.1;
+      if (autoFit) fit();
+      needDraw = true;
+    }
+    stats.alpha = alpha; stats.frames++;
+    if (needDraw) { draw(); needDraw = false; }
+    if (alpha > AMIN) wake();
+  };
+  const dirty = () => { needDraw = true; wake(); };
+
+  const toWorld = (mx, my) => [(mx - ox) / sc, (my - oy) / sc];
+  const hit = (mx, my) => {
+    const [wx, wy] = toWorld(mx, my);
+    const slack = 3 / sc;
+    let best = -1, bd = 1e30;
+    for (let i = 0; i < N; i++) {
+      if (hidden.has(ki[i])) continue;
+      const dx = px[i] - wx, dy = py[i] - wy, r = rad[i] + slack;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < r * r && d2 < bd) { bd = d2; best = i; }
+    }
+    return best;
+  };
+
+  let panning = false, moved = false, lx = 0, ly = 0;
+  const mpos = (ev) => { const r = canvas.getBoundingClientRect(); return [ev.clientX - r.left, ev.clientY - r.top]; };
+  canvas.addEventListener("pointerdown", (ev) => {
+    const [mx, my] = mpos(ev);
+    canvas.setPointerCapture(ev.pointerId);
+    moved = false; lx = mx; ly = my;
+    autoFit = false;
+    const i = hit(mx, my);
+    if (i >= 0) { dragI = i; [dragX, dragY] = toWorld(mx, my); }
+    else { panning = true; canvas.style.cursor = "grabbing"; }
+  });
+  canvas.addEventListener("pointermove", (ev) => {
+    const [mx, my] = mpos(ev);
+    if (dragI >= 0) {
+      if (Math.abs(mx - lx) + Math.abs(my - ly) > 3) moved = true;
+      [dragX, dragY] = toWorld(mx, my);
+      if (moved) { alpha = Math.max(alpha, 0.3); wake(); }
+      return;
+    }
+    if (panning) {
+      ox += mx - lx; oy += my - ly; lx = mx; ly = my;
+      moved = true; dirty(); return;
+    }
+    const h = hit(mx, my);
+    if (h !== hover) {
+      hover = h;
+      canvas.style.cursor = h >= 0 ? "pointer" : "grab";
+      if (h >= 0) {
+        const n = model.nodes[h];
+        tipShow(`<b>${esc(n.label)}</b><br>${esc(model.kinds[ki[h]])} · ${deg[h]} 度` +
+          (model.live ? `<br><span class="dim">${esc(elide(n.ref))}</span>` : ""), ev.clientX, ev.clientY);
+      } else tipHide();
+      dirty();
+    } else if (h >= 0) tipShow($("tip").innerHTML, ev.clientX, ev.clientY);
+  });
+  canvas.addEventListener("pointerup", (ev) => {
+    if (dragI >= 0 && !moved && model.live) {
+      location.hash = "#/e/" + encodeURIComponent(model.nodes[dragI].ref);
+    }
+    dragI = -1; panning = false;
+    canvas.style.cursor = hover >= 0 ? "pointer" : "grab";
+  });
+  canvas.addEventListener("pointerleave", () => { if (hover >= 0) { hover = -1; tipHide(); dirty(); } });
+  canvas.addEventListener("wheel", (ev) => {
+    ev.preventDefault();
+    autoFit = false;
+    const [mx, my] = mpos(ev);
+    const f = Math.exp(-ev.deltaY * 0.0016);
+    const s2 = Math.min(8, Math.max(0.12, sc * f));
+    ox = mx - ((mx - ox) * s2) / sc; oy = my - ((my - oy) * s2) / sc;
+    sc = s2; dirty();
+  }, { passive: false });
+
+  const fitHeight = () => {
+    const top = canvas.parentElement.getBoundingClientRect().top;
+    canvas.parentElement.style.height = Math.max(320, window.innerHeight - top - 2) + "px";
+    size(); dirty();
+  };
+  const ro = new ResizeObserver(() => { size(); dirty(); });
+  ro.observe(canvas.parentElement);
+  window.addEventListener("resize", fitHeight);
+  fitHeight();
+  wake();
+
+  return {
+    toggleKind(k, on) { if (on) hidden.delete(k); else hidden.add(k); if (hover >= 0 && hidden.has(ki[hover])) { hover = -1; tipHide(); } dirty(); },
+    dispose() {
+      disposed = true;
+      if (raf) cancelAnimationFrame(raf);
+      ro.disconnect();
+      window.removeEventListener("resize", fitHeight);
+      tipHide();
+    },
+  };
 }
 
 /* ── invalid vault plate ────────────────────────────────────── */
@@ -547,9 +1175,11 @@ $("q").addEventListener("keydown", (ev) => {
 document.addEventListener("keydown", (ev) => {
   if (ev.target.tagName === "INPUT") return;
   if (ev.key === "/") { ev.preventDefault(); $("q").focus(); }
+  if (ev.key === "g" && D && D.ok) location.hash = "#/graph";
   if (ev.key === "Escape") {
     const h = decodeURIComponent(location.hash);
-    if (h.startsWith("#/e/")) { const n = byRef[h.slice(4)]; location.hash = n ? "#/k/" + encodeURIComponent(n.kind) : "#/"; }
+    if (h.startsWith("#/graph")) location.hash = "#/";
+    else if (h.startsWith("#/e/")) { const n = byRef[h.slice(4)]; location.hash = n ? "#/k/" + encodeURIComponent(n.kind) : "#/"; }
     else if (h.startsWith("#/k/")) location.hash = "#/";
   }
   if (ev.key === "c") {
