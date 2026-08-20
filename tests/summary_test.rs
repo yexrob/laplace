@@ -56,6 +56,19 @@ fn floor_budget_still_emits_t0_contract() {
 fn skill_text_is_embedded_and_installable() {
     assert!(skill::SKILL_TEXT.starts_with("---\nname: entity-map"));
     assert!(skill::SKILL_TEXT.contains("Same-turn updates"));
+    assert!(skill::SKILL_TEXT.contains("First use: initialize before consulting"));
+    assert!(skill::SKILL_TEXT.contains("Scouts are read-only"));
+    assert!(skill::SKILL_TEXT.contains("single writer"));
+    assert!(skill::SKILL_TEXT.contains("laplace init"));
+    assert!(skill::SKILL_TEXT.contains("Populate in two passes"));
+    assert!(skill::SKILL_TEXT.contains("not proof of total repository coverage"));
+    assert!(skill::SKILL_TEXT.contains("do not commit merely because"));
+    assert!(skill::SKILL_TEXT.contains("repository-wide `source` glob"));
+    assert!(skill::SKILL_TEXT.contains("If a matching vault already exists, skip bootstrap"));
+    assert!(skill::SKILL_TEXT.contains("When no matching vault exists, initialize only"));
+    assert!(skill::SKILL_TEXT.contains("pass `--vault"));
+    assert!(skill::SKILL_TEXT.contains("temporary\nfile first"));
+    assert!(skill::SKILL_TEXT.contains("drift` cannot audit a project-root vault"));
     assert!(skill::MCP_INSTRUCTIONS.contains("laplace_schema"));
 
     let tmp = tempfile::tempdir().unwrap();
