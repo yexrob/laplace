@@ -200,6 +200,8 @@ Seven tools; one semantics shared by CLI (`laplace query <tool>`, human text def
 
 MCP tool descriptions are contract: each carries a one-line when-to-use (e.g. `laplace_search`: "resolve names to refs — search before adding or guessing"). MCP exposes the seven queries, `laplace_validate`, `laplace_drift`, the six write operations, `laplace_schema_edit` (§2), `laplace_vaults`, and `laplace_serve` (start or reuse the session-scoped view thread for a vault and return its URL — it dies with the session, no orphan processes) — eighteen tools. There is no raw-file write tool; writes are semantic operations only.
 
+**Default MCP mode**: `laplace mcp` discovers the nearest `laplace/schema.yaml` upward from its startup cwd and fixes that vault for the server lifetime. If discovery finds none, startup still succeeds in an empty mode rooted at that cwd: initialization and tool listing remain available, `laplace_vaults` returns no vaults, and vault-dependent calls report that no loadable vault exists. An explicit invalid `--vault DIR` remains a startup error.
+
 **Multi-vault scan mode**: `laplace mcp --scan DIR` discovers every vault under DIR (every directory holding a schema.yaml, gitignore-aware) and serves them all from one process. Every tool takes an optional `vault` selector (schema name or path suffix) — required only while several loadable vaults exist; `laplace_vaults` lists what was found with entity counts and validity, so unloadable vaults are disclosed, never silently skipped.
 
 ## 6. Drift (cross-session calibration as a tool)

@@ -27,13 +27,29 @@ struct Server {
 
 impl Server {
     fn start(vault: &Path) -> Self {
-        let mut child = Command::new(env!("CARGO_BIN_EXE_laplace"))
+        let child = Command::new(env!("CARGO_BIN_EXE_laplace"))
             .args(["--vault", &vault.to_string_lossy(), "mcp"])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .spawn()
             .unwrap();
+        Self::from_child(child)
+    }
+
+    fn start_in(cwd: &Path) -> Self {
+        let child = Command::new(env!("CARGO_BIN_EXE_laplace"))
+            .arg("mcp")
+            .current_dir(cwd)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+        Self::from_child(child)
+    }
+
+    fn from_child(mut child: Child) -> Self {
         let stdin = child.stdin.take().unwrap();
         let stdout = BufReader::new(child.stdout.take().unwrap());
         Self {
@@ -72,6 +88,36 @@ impl Drop for Server {
         let _ = self.child.kill();
         let _ = self.child.wait();
     }
+}
+
+#[test]
+fn mcp_starts_without_a_vault_in_the_working_directory() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut s = Server::start_in(tmp.path());
+
+    let init = s.request(
+        "initialize",
+        json!({ "protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": { "name": "t", "version": "0" } }),
+    );
+    assert_eq!(init["result"]["serverInfo"]["name"], "laplace");
+
+    let tools = s.request("tools/list", json!({}));
+    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 18);
+
+    let (err, text) = s.call_tool("laplace_vaults", json!({}));
+    assert!(!err, "{text}");
+    let listed: Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(
+        PathBuf::from(listed["root"].as_str().unwrap())
+            .canonicalize()
+            .unwrap(),
+        tmp.path().canonicalize().unwrap()
+    );
+    assert_eq!(listed["vaults"], json!([]));
+
+    let (err, text) = s.call_tool("laplace_search", json!({ "q": "anything" }));
+    assert!(err, "{text}");
+    assert!(text.contains("no loadable vault under"), "{text}");
 }
 
 #[test]
@@ -270,7 +316,11 @@ fn pipelined_burst_is_served_completely() {
         if i == 5 {
             // a notification (no id — must produce no response) and a garbage
             // line (must produce exactly one id:null parse error)
-            writeln!(s.stdin, r#"{{"jsonrpc":"2.0","method":"notifications/cancelled"}}"#).unwrap();
+            writeln!(
+                s.stdin,
+                r#"{{"jsonrpc":"2.0","method":"notifications/cancelled"}}"#
+            )
+            .unwrap();
             writeln!(s.stdin, "{{torn json").unwrap();
         }
     }

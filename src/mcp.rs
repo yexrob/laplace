@@ -16,6 +16,8 @@ use std::path::{Path, PathBuf};
 pub enum McpMode {
     /// One vault, fixed at startup (`--vault` / upward discovery).
     Single(PathBuf),
+    /// No vault was discoverable at startup; tools stay available.
+    Empty(PathBuf),
     /// Every vault found under a root (`--scan`); tools select via `vault`.
     Scan(PathBuf),
 }
@@ -65,6 +67,7 @@ fn scan_vaults(root: &Path) -> Vec<VaultEntry> {
 fn resolve_vault_dir(mode: &McpMode, args: &Value) -> Result<PathBuf> {
     match mode {
         McpMode::Single(dir) => Ok(dir.clone()),
+        McpMode::Empty(root) => bail!("no loadable vault under {}", root.display()),
         McpMode::Scan(root) => {
             let entries = scan_vaults(root);
             let loadable: Vec<&VaultEntry> =
@@ -195,7 +198,7 @@ fn call(
     if name == "laplace_vaults" {
         let root = match mode {
             McpMode::Single(dir) => dir.clone(),
-            McpMode::Scan(root) => root.clone(),
+            McpMode::Empty(root) | McpMode::Scan(root) => root.clone(),
         };
         let entries = match mode {
             McpMode::Single(dir) => vec![VaultEntry {
@@ -203,6 +206,7 @@ fn call(
                 dir: dir.clone(),
                 load_error: None,
             }],
+            McpMode::Empty(_) => Vec::new(),
             McpMode::Scan(root) => scan_vaults(root),
         };
         return Ok(json!({

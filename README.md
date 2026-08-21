@@ -188,7 +188,20 @@ Use `laplace <command> --help` for all flags and input forms. Entity and schema 
 
 ### MCP
 
-Configure an MCP client to start Laplace over stdio with an explicit vault:
+Configure an MCP client to start Laplace over stdio. For a global configuration, let the server discover `laplace/schema.yaml` upward from the MCP process working directory:
+
+```json
+{
+  "mcpServers": {
+    "laplace": {
+      "command": "laplace",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+If that directory has not initialized Laplace yet, the MCP server still starts and exposes its tools. `laplace_vaults` returns an empty list and vault-dependent calls report that no vault is available. An explicit vault remains useful when the MCP client does not launch stdio servers from the project directory:
 
 ```json
 {

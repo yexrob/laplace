@@ -263,7 +263,11 @@ fn run(cli: Cli) -> Result<ExitCode> {
     if let Cmd::Mcp { scan } = &cli.cmd {
         let mode = match scan {
             Some(root) => mcp::McpMode::Scan(root.clone()),
-            None => mcp::McpMode::Single(vault::discover(&cwd, cli.vault.as_deref())?),
+            None => match vault::discover(&cwd, cli.vault.as_deref()) {
+                Ok(dir) => mcp::McpMode::Single(dir),
+                Err(_) if cli.vault.is_none() => mcp::McpMode::Empty(cwd.clone()),
+                Err(e) => return Err(e),
+            },
         };
         mcp::serve(mode)?;
         return Ok(ExitCode::SUCCESS);
